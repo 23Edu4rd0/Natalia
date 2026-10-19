@@ -59,13 +59,15 @@ public sealed class Ambiente : IDisposable
     public PlataformaFalsa P { get; } = new();
     readonly string? antigaPasta = Environment.GetEnvironmentVariable("GESTAO_DATA_DIR");
 
-    public Ambiente()
+    /// <param name="simples">false (padrão dos testes) = modo avançado, com todas as telas; true = o modo padrão do programa.</param>
+    public Ambiente(bool simples = false)
     {
         Directory.CreateDirectory(Pasta);
         Environment.SetEnvironmentVariable("GESTAO_DATA_DIR", Pasta);   // notas/exportações/logs também vão para a pasta temporária
         Conn = Banco.Conectar(Path.Combine(Pasta, "gestao.db"));
         Banco.Migrar(Conn);
         S = new Servico(Conn);
+        if (!simples) S.SalvarConfig(MainWindow.ConfigModo, "avancado");
         Plat.Atual = P;
         K.DebounceMs = 0;                                   // busca imediata nos testes
         Janela = new MainWindow(S) { Width = 1240, Height = 760 };

@@ -132,6 +132,20 @@ public partial class Servico
         });
     }
 
+    /// <summary>Soma ao estoque uma mercadoria que chegou, sem precisar de fornecedor. Retorna o novo estoque.</summary>
+    public long ReceberMercadoria(long produtoId, long quantidade, string? obs = "")
+    {
+        var q = Inteiro(quantidade, "a quantidade", 1);
+        var o = Texto(obs, "a observação", false, 200);
+        return Tx(() =>
+        {
+            ProdutoAtivo(produtoId);
+            Exec("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", q, produtoId);
+            Movimentar(produtoId, "ENTRADA", q, "Chegada de mercadoria", o);
+            return Escalar("SELECT estoque FROM produtos WHERE id = ?", produtoId);
+        });
+    }
+
     // ------------------------------------------------------------------ estoque (consultas)
     public List<ResumoCategoria> ResumoPorCategoria()
     {

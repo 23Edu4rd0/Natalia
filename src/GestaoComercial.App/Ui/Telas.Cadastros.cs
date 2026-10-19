@@ -48,7 +48,10 @@ public abstract class CadastroTela<T> : Tela where T : class
         var direita = K.Linha(K.Botao("Editar", SeguroAsync(EditarAsync), icone: "editar"), K.Botao("Excluir", SeguroAsync(ExcluirAsync), icone: "lixeira", classe: "perigo"));
         MontarAcoes(direita);
         direita.Children.Add(K.Botao("Exportar CSV", SeguroAsync(ExportarAsync), icone: "exportar"));
-        var acoes = new StackPanel { Spacing = 10, Margin = new Thickness(0, 0, 0, 14), Children = { filtros, direita } };
+        // os botões quebram de linha quando a janela é estreita (em vez de sair da tela)
+        var botoes = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var bt in direita.Children.ToList()) { direita.Children.Remove(bt); bt.Margin = new Thickness(0, 0, 8, 8); botoes.Children.Add(bt); }
+        var acoes = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 10), Children = { K.Margem(filtros, 0, 0, 0, 8), botoes } };
 
         Tabela = new Tabela(Colunas);
         total.Margin = new Thickness(0, 10, 0, 0);
@@ -175,16 +178,20 @@ public sealed class ProdutosTela : CadastroTela<Produto>
     bool carregando;
 
     public ProdutosTela(MainWindow app) : base(app) { }
-    protected override string Descricao => "O que você vende: preços, tipos e estoque mínimo. Linhas em vermelho precisam de reposição.";
+    protected override string Descricao => App.Avancado
+        ? "O que você vende: preços, tipos e estoque mínimo. Linhas em vermelho precisam de reposição."
+        : "O que você vende e quanto tem de cada um. Linhas em vermelho: acabando ou zerado.";
     protected override string MensagemVazia => "Nenhum produto cadastrado ainda.\nClique em “Novo produto” ou use “Importar planilha” para trazer sua lista do Excel.";
 
     protected override string Singular => "produto";
     protected override string Plural => "produtos";
-    protected override Col[] Colunas => new[]
-    {
-        new Col("Código", 100), new Col("Produto", 260, Expande: true), new Col("Tipo", 140), new Col("Un.", 60), new Col("Custo", 100, true),
-        new Col("Venda", 100, true), new Col("Estoque", 105, true), new Col("Mín.", 80, true), new Col("Situação", 110, Chip: true),
-    };
+    protected override Col[] Colunas => App.Avancado
+        ? new[]
+        {
+            new Col("Código", 100), new Col("Produto", 260, Expande: true), new Col("Tipo", 140), new Col("Un.", 60), new Col("Custo", 100, true),
+            new Col("Venda", 100, true), new Col("Estoque", 105, true), new Col("Mín.", 80, true), new Col("Situação", 110, Chip: true),
+        }
+        : new[] { new Col("Produto", 260, Expande: true), new Col("Tipo", 150), new Col("Preço", 110, true), new Col("Estoque", 105, true), new Col("Situação", 110, Chip: true) };
 
     protected override void MontarFiltros(StackPanel barra)
     {
@@ -197,7 +204,54 @@ public sealed class ProdutosTela : CadastroTela<Produto>
     {
         barra.Children.Insert(0, K.Botao("Importar planilha…", SeguroAsync(ImportarAsync), icone: "exportar"));
         barra.Children.Insert(1, K.Botao("Tipos…", SeguroAsync(GerenciarTiposAsync), icone: "produtos"));
-        barra.Children.Insert(2, K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "relatorios"));
+        if (App.Avancado) barra.Children.Insert(2, K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "relatorios"));
+        else
+        {
+            // no modo simples o estoque se mexe aqui mesmo (não há páginas de Estoque e Entrada)
+            barra.Children.Insert(2, K.Botao("Chegou mercadoria", SeguroAsync(() => ChegouMercadoriaAsync()), icone: "entrada", classe: "primario"));
+            barra.Children.Insert(3, K.Botao("Corrigir estoque", SeguroAsync(CorrigirEstoqueAsync), icone: "editar"));
+        }
+    }
+
+    /// <summary>Modo simples: soma ao estoque o que chegou, sem fornecedor nem nota de entrada.</summary>
+    public async Task ChegouMercadoriaAsync()
+    {
+        var produtos = Svc.ListarProdutos();
+        if (produtos.Count == 0) { Dica("Cadastre um produto primeiro."); return; }
+        var selecionado = Tabela.IdLong;
+        var campos = new List<Campo>
+        {
+            new() { Chave = "produto", Rotulo = "Qual produto chegou", Tipo = TipoCampo.Escolha, Obrigatorio = true, Opcoes = produtos.Select(p => ((long?)p.Id, $"{p.Nome}  (tem {p.Estoque})")).ToList() },
+            new() { Chave = "qtd", Rotulo = "Quantas unidades chegaram", Tipo = TipoCampo.Inteiro, Obrigatorio = true },
+        };
+        string resumo = "";
+        var ok = await FormDialog.Abrir(Janela, "Chegou mercadoria", campos, new() { ["produto"] = selecionado ?? produtos[0].Id }, v =>
+        {
+            var pid = v.Escolha("produto") ?? throw new ValidacaoException("Escolha o produto que chegou.");
+            var novo = Svc.ReceberMercadoria(pid, v.Num("qtd"));
+            resumo = $"{Svc.ObterProduto(pid).Nome}: agora tem {novo}.";
+        }, "Somar ao estoque");
+        if (!ok) return;
+        AtualizarTudo();
+        Sucesso(resumo);
+    }
+
+    /// <summary>Modo simples: acerta a quantidade de um produto conforme a contagem real.</summary>
+    public async Task CorrigirEstoqueAsync()
+    {
+        var pid = Exigir(Tabela.IdLong, "um produto");
+        var p = Svc.ObterProduto(pid);
+        var campos = new List<Campo>
+        {
+            new() { Chave = "atual", Rotulo = "Quantidade no sistema", Tipo = TipoCampo.Inteiro, SomenteLeitura = true },
+            new() { Chave = "nova", Rotulo = "Quantidade que você tem de verdade", Tipo = TipoCampo.Inteiro, Obrigatorio = true },
+        };
+        if (await FormDialog.Abrir(Janela, $"Corrigir estoque — {p.Nome}", campos, new() { ["atual"] = p.Estoque, ["nova"] = p.Estoque },
+                                   v => Svc.AjustarEstoque(pid, v.Num("nova"), "Correção de estoque"), "Corrigir"))
+        {
+            AtualizarTudo();
+            Sucesso("Estoque corrigido.");
+        }
     }
 
     public Task ImportarAsync() => ImportarProdutosDialog.Abrir(Janela, Svc, AtualizarTudo);
@@ -253,15 +307,15 @@ public sealed class ProdutosTela : CadastroTela<Produto>
     protected override Linha ParaLinha(Produto p) => new()
     {
         Id = p.Id.ToString(), Estilo = !p.Ativo ? "cancelado" : p.Baixo ? "alerta" : "",
-        Fabrica = () => new[] { p.Codigo, p.Nome, p.Categoria, p.Unidade, Util.FmtDinheiro(p.PrecoCusto), Util.FmtDinheiro(p.PrecoVenda),
+        Fabrica = !App.Avancado ? () => new[] { p.Nome, p.Categoria, Util.FmtDinheiro(p.PrecoVenda), p.Estoque.ToString(), p.Ativo ? "Ativo" : "Inativo" } : () => new[] { p.Codigo, p.Nome, p.Categoria, p.Unidade, Util.FmtDinheiro(p.PrecoCusto), Util.FmtDinheiro(p.PrecoVenda),
                                 p.Estoque.ToString(), p.EstoqueMin.ToString(), p.Ativo ? "Ativo" : "Inativo" },
     };
     protected override Produto Obter(long id) => Svc.ObterProduto(id);
     protected override string NomeDe(Produto p) => p.Nome;
 
-    protected override List<Campo> Campos(bool novo) => FormProduto.Campos(Svc, novo);
+    protected override List<Campo> Campos(bool novo) => FormProduto.Campos(Svc, novo, App.Avancado);
     protected override Dictionary<string, object?> Iniciais(Produto? p) => FormProduto.Iniciais(p);
-    protected override Action<FormDialog, string>? AoMudarCampo => FormProduto.AoMudar;
+    protected override Action<FormDialog, string>? AoMudarCampo => App.Avancado ? FormProduto.AoMudar : null;
     protected override void Salvar(Valores v, long? id) => FormProduto.Salvar(Svc, v, id);
 
     protected override ResultadoExclusao Remover(long id) => Svc.ExcluirProduto(id);

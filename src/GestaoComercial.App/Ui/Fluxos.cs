@@ -46,14 +46,14 @@ public static class Fluxos
     /// Cadastro de produto a partir do que foi digitado na busca (nome ou código de barras): evita ter que sair da venda/entrada.
     /// Retorna o produto criado, ou null se cancelou.
     /// </summary>
-    public static async Task<Produto?> NovoProdutoAsync(Window? dono, Servico svc, string? busca = null)
+    public static async Task<Produto?> NovoProdutoAsync(Window? dono, Servico svc, string? busca = null, bool avancado = true)
     {
         var t = (busca ?? "").Trim();
         var pareceCodigo = t.Length > 0 && !t.Contains(' ') && t.Any(char.IsDigit);
         long? criado = null;
-        var ok = await FormDialog.Abrir(dono, "Novo produto", FormProduto.Campos(svc, true),
+        var ok = await FormDialog.Abrir(dono, "Novo produto", FormProduto.Campos(svc, true, avancado),
             FormProduto.Iniciais(null, pareceCodigo ? t : null, pareceCodigo ? null : t),
-            v => criado = FormProduto.Salvar(svc, v, null), "Cadastrar", FormProduto.AoMudar);
+            v => criado = FormProduto.Salvar(svc, v, null), "Cadastrar", avancado ? FormProduto.AoMudar : null);
         return ok && criado != null ? svc.ObterProduto(criado.Value) : null;
     }
 

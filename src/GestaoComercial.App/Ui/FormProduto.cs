@@ -8,25 +8,30 @@ public static class FormProduto
 {
     static bool calculando;
 
-    public static List<Campo> Campos(Servico svc, bool novo)
+    /// <summary>Modo simples: só nome, tipo, preço e quantidade. O avançado traz também código, unidade, custo, margem e estoque mínimo.</summary>
+    public static List<Campo> Campos(Servico svc, bool novo, bool avancado)
     {
         var cats = new List<(long? Valor, string Rotulo)> { (null, "(sem tipo)") };
         cats.AddRange(svc.ListarCategorias().Select(c => ((long?)c.Id, c.Nome)));
-        var c = new List<Campo>
+        var c = new List<Campo> { new() { Chave = "nome", Rotulo = "Nome do produto", Obrigatorio = true } };
+        if (avancado) c.Add(new Campo { Chave = "codigo", Rotulo = "Código / cód. barras", Dica = "Em branco = gerado automaticamente. Pode passar o leitor de código de barras aqui." });
+        c.Add(new Campo { Chave = "categoria", Rotulo = "Tipo de produto", Tipo = TipoCampo.Escolha, Opcoes = cats });
+        if (avancado)
         {
-            new() { Chave = "nome", Rotulo = "Nome do produto", Obrigatorio = true },
-            new() { Chave = "codigo", Rotulo = "Código / cód. barras", Dica = "Em branco = gerado automaticamente. Pode passar o leitor de código de barras aqui." },
-            new() { Chave = "categoria", Rotulo = "Tipo de produto", Tipo = TipoCampo.Escolha, Opcoes = cats },
-            new() { Chave = "unidade", Rotulo = "Unidade", Dica = "un, kg, cx, pct, l..." },
-            new() { Chave = "custo", Rotulo = "Preço de custo (R$)", Tipo = TipoCampo.Dinheiro },
-            new() { Chave = "margem", Rotulo = "Margem de lucro (%)", Dica = "Opcional: digite o custo e a margem e o preço de venda é calculado." },
-            new() { Chave = "venda", Rotulo = "Preço de venda (R$)", Tipo = TipoCampo.Dinheiro, Obrigatorio = true },
-            new() { Chave = "minimo", Rotulo = "Estoque mínimo", Tipo = TipoCampo.Inteiro, Dica = "Avisa quando o estoque chegar a este valor." },
-        };
-        if (novo) c.Add(new Campo { Chave = "inicial", Rotulo = "Estoque inicial", Tipo = TipoCampo.Inteiro });
+            c.Add(new Campo { Chave = "unidade", Rotulo = "Unidade", Dica = "un, kg, cx, pct, l..." });
+            c.Add(new Campo { Chave = "custo", Rotulo = "Preço de custo (R$)", Tipo = TipoCampo.Dinheiro });
+            c.Add(new Campo { Chave = "margem", Rotulo = "Margem de lucro (%)", Dica = "Opcional: digite o custo e a margem e o preço de venda é calculado." });
+        }
+        c.Add(new Campo { Chave = "venda", Rotulo = "Preço de venda (R$)", Tipo = TipoCampo.Dinheiro, Obrigatorio = true });
+        if (avancado) c.Add(new Campo { Chave = "minimo", Rotulo = "Estoque mínimo", Tipo = TipoCampo.Inteiro, Dica = "Avisa quando o estoque chegar a este valor." });
+        if (novo) c.Add(new Campo { Chave = "inicial", Rotulo = avancado ? "Estoque inicial" : "Quantidade em estoque", Tipo = TipoCampo.Inteiro });
         else
         {
-            c.Add(new Campo { Chave = "estoque", Rotulo = "Estoque atual", Tipo = TipoCampo.Inteiro, SomenteLeitura = true, Dica = "Para corrigir o estoque use 'Ajustar estoque' na página Estoque." });
+            c.Add(new Campo
+            {
+                Chave = "estoque", Rotulo = avancado ? "Estoque atual" : "Quantidade em estoque", Tipo = TipoCampo.Inteiro, SomenteLeitura = true,
+                Dica = avancado ? "Para corrigir o estoque use 'Ajustar estoque' na página Estoque." : "Para mudar, use “Chegou mercadoria” ou “Corrigir estoque” na lista de produtos.",
+            });
             c.Add(new Campo { Chave = "ativo", Rotulo = "Ativo", Tipo = TipoCampo.Bool });
         }
         return c;
@@ -53,7 +58,7 @@ public static class FormProduto
     /// <summary>Calcula preço de venda a partir de custo e margem (e a margem a partir do preço), enquanto a pessoa digita.</summary>
     public static void AoMudar(FormDialog f, string chave)
     {
-        if (calculando) return;
+        if (calculando || !f.Chaves.Contains("custo")) return;    // modo simples não tem custo/margem
         try
         {
             calculando = true;
@@ -76,7 +81,14 @@ public static class FormProduto
         finally { calculando = false; }
     }
 
-    public static long Salvar(Servico svc, Valores v, long? id) =>
-        svc.SalvarProduto(new ProdutoDados(v.Texto("nome"), v.Texto("codigo"), v.Escolha("categoria"), v.Texto("unidade"), v.Num("custo"), v.Num("venda"),
-                                           v.Num("minimo"), v.Num("inicial"), id == null || v.Bool("ativo")), id);
+    /// <summary>Campos que o formulário não mostra (modo simples) mantêm o valor que o produto já tinha.</summary>
+    public static long Salvar(Servico svc, Valores v, long? id)
+    {
+        var atual = id is long i ? svc.ObterProduto(i) : null;
+        string Txt(string k, string padrao) => v.Tem(k) ? v.Texto(k) : padrao;
+        long Num(string k, long padrao) => v.Tem(k) ? v.Num(k) : padrao;
+        return svc.SalvarProduto(new ProdutoDados(v.Texto("nome"), Txt("codigo", atual?.Codigo ?? ""), v.Escolha("categoria"), Txt("unidade", atual?.Unidade ?? "un"),
+                                                  Num("custo", atual?.PrecoCusto ?? 0), v.Num("venda"), Num("minimo", atual?.EstoqueMin ?? 0), v.Num("inicial"),
+                                                  id == null || v.Bool("ativo")), id);
+    }
 }

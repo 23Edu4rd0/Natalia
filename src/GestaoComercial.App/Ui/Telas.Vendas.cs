@@ -26,6 +26,8 @@ public sealed class VendaTela : Tela
     readonly TextBlock lblTroco = K.Rotulo("", true, 16);
     readonly TextBlock lblClienteInfo = new() { FontSize = 12.5, TextWrapping = Avalonia.Media.TextWrapping.Wrap, IsVisible = false };
     readonly StackPanel painelTroco;
+    readonly StackPanel extras;
+    readonly Button botaoExtras;
     readonly Grid linhaDesconto;
     Dictionary<string, long?> clientes = new();
     bool finalizando;
@@ -41,7 +43,7 @@ public sealed class VendaTela : Tela
 
     public VendaTela(MainWindow app) : base(app)
     {
-        Editor = new EditorItens(Svc, true, Recalcular);
+        Editor = new EditorItens(Svc, true, Recalcular, App.Avancado);
 
         Cliente = new AutoCompleteBox
         {
@@ -90,6 +92,17 @@ public sealed class VendaTela : Tela
         finalizar.HorizontalAlignment = HorizontalAlignment.Stretch; finalizar.HorizontalContentAlignment = HorizontalAlignment.Center;
         finalizar.FontSize = 16; finalizar.MinHeight = 52;
 
+        // modo simples: desconto, troco e observação ficam atrás de um botão (modo avançado mostra sempre)
+        extras = new StackPanel
+        {
+            Spacing = 14,
+            Children = { new StackPanel { Spacing = 6, Children = { K.Campo("Desconto (R$ ou %)", Desconto), chipsDesconto } }, painelTroco, K.Campo("Observações", Obs) },
+        };
+        botaoExtras = K.Botao("＋ Desconto, troco ou observação", () => MostrarExtras(!extras.IsVisible), classe: "chip");
+        botaoExtras.HorizontalAlignment = HorizontalAlignment.Left;
+        botaoExtras.IsVisible = !App.Avancado;
+        extras.IsVisible = App.Avancado;
+
         var resumo = new StackPanel
         {
             Spacing = 14,
@@ -98,9 +111,8 @@ public sealed class VendaTela : Tela
                 K.H2("Resumo da venda"),
                 new StackPanel { Spacing = 6, Children = { K.Campo("Cliente", gCliente), lblClienteInfo } },
                 K.Campo("Forma de pagamento", Pagamento),
-                new StackPanel { Spacing = 6, Children = { K.Campo("Desconto (R$ ou %)", Desconto), chipsDesconto } },
-                painelTroco,
-                K.Campo("Observações", Obs),
+                botaoExtras,
+                extras,
                 new Border { Height = 1, Background = Cores.P("#EEF0F5"), Margin = new Thickness(0, 2) },
                 linhaSub, linhaDesconto,
                 new StackPanel { Spacing = 0, Children = { K.Etiqueta("Total a pagar"), lblTotal } },
@@ -199,8 +211,18 @@ public sealed class VendaTela : Tela
         }
     }
 
+    /// <summary>Mostra/esconde desconto, troco e observação (só faz diferença no modo simples).</summary>
+    public void MostrarExtras(bool mostrar)
+    {
+        if (App.Avancado) return;
+        extras.IsVisible = mostrar;
+        botaoExtras.Content = mostrar ? "－ Esconder desconto, troco e observação" : "＋ Desconto, troco ou observação";
+    }
+    public bool ExtrasVisiveis => extras.IsVisible;
+
     void LimparTudo()
     {
+        MostrarExtras(false);
         Editor.Limpar(); Desconto.Text = ""; Obs.Text = ""; ValorRecebido.Text = ""; Cliente.Text = ""; Pagamento.SelectedIndex = 0;
     }
 

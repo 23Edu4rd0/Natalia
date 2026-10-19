@@ -78,6 +78,12 @@ public sealed class ConfigTela : Tela
     public TextBox Telefone { get; } = K.Caixa("");
     public TextBox Rodape { get; } = K.Caixa("");
 
+    public ComboBox Modo { get; }
+    static readonly (string Valor, string Rotulo)[] OpcoesModo =
+    {
+        ("simples", "Simples — só o necessário para vender (recomendado)"),
+        ("avancado", "Avançado — caixa, fornecedores, entradas, estoque, relatórios, custos e mais"),
+    };
     public ComboBox AposVenda { get; }
     static readonly (string Valor, string Rotulo)[] OpcoesAposVenda =
     {
@@ -90,6 +96,14 @@ public sealed class ConfigTela : Tela
 
     public ConfigTela(MainWindow app) : base(app)
     {
+        Modo = K.Combo(OpcoesModo.Select(o => o.Rotulo), double.NaN, OpcoesModo[0].Rotulo); Modo.HorizontalAlignment = HorizontalAlignment.Stretch;
+        Modo.SelectionChanged += (_, _) =>
+        {
+            if (carregando || Modo.SelectedIndex < 0) return;
+            var avancado = OpcoesModo[Modo.SelectedIndex].Valor == "avancado";
+            if (avancado == App.Avancado) return;
+            Seguro(() => App.DefinirModo(avancado))();      // refaz o menu e as telas (inclusive esta)
+        };
         AposVenda = K.Combo(OpcoesAposVenda.Select(o => o.Rotulo), double.NaN, OpcoesAposVenda[0].Rotulo); AposVenda.HorizontalAlignment = HorizontalAlignment.Stretch;
         AposVenda.SelectionChanged += (_, _) =>
         {
@@ -117,6 +131,11 @@ public sealed class ConfigTela : Tela
         bk.Children.Add(K.Discreto($"Pasta de dados: {Config.PastaDados()}"));
         var backup = Grupo("Backup e dados", bk);
 
+        var modo = Grupo("Modo de uso", new StackPanel
+        {
+            Spacing = 8,
+            Children = { Modo, K.Discreto("O modo simples esconde o que uma venda do dia a dia não usa. Seus dados não mudam: dá para trocar quando quiser.") },
+        });
         var venda = Grupo("Ao finalizar uma venda", AposVenda);
 
         var imp = Grupo("Importante", new TextBlock
@@ -124,7 +143,7 @@ public sealed class ConfigTela : Tela
             Text = "As notas emitidas por este programa são comprovantes internos de venda e NÃO têm valor fiscal.\nPara emitir NF-e / NFC-e / cupom fiscal é necessário um emissor autorizado pela SEFAZ.",
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
         });
-        Content = new ScrollViewer { Content = new StackPanel { Spacing = 14, MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left, Children = { empresa, venda, backup, imp } } };
+        Content = new ScrollViewer { Content = new StackPanel { Spacing = 14, MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left, Children = { modo, empresa, venda, backup, imp } } };
     }
 
     static Control Grupo(string titulo, Control conteudo) =>
@@ -133,6 +152,7 @@ public sealed class ConfigTela : Tela
     public override void Atualizar()
     {
         carregando = true;
+        Modo.SelectedIndex = App.Avancado ? 1 : 0;
         var idx = Array.FindIndex(OpcoesAposVenda, o => o.Valor == Svc.ObterConfig(VendaTela.ConfigAposVenda, "aviso"));
         AposVenda.SelectedIndex = idx < 0 ? 0 : idx;
         carregando = false;

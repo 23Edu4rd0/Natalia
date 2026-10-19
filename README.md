@@ -29,6 +29,11 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 ## O que ele faz
 
+**Modo simples e modo avançado** (Configurações → *Modo de uso*; o programa abre no **simples**)
+- **Simples** (padrão): menu com só *Painel, Nova venda, Vendas, A receber, Clientes, Produtos e Configurações*. Cadastro de produto com nome, tipo, preço e quantidade. Na venda, desconto/troco/observação ficam atrás de um botão. O estoque se mexe na lista de produtos (*Chegou mercadoria* e *Corrigir estoque*), sem fornecedor.
+- **Avançado**: tudo — Caixa, Fornecedores, Estoque por tipo, Entrada de mercadorias, Relatórios, custo/margem/código/estoque mínimo, reajuste de preços e lucro no painel.
+- A troca é na hora e os dados não mudam; o programa lembra a escolha.
+
 **Novidades da 2.2 (menos cliques, mais rápido)**
 - **Venda em poucos cliques**: sem janela de confirmação; ao finalizar aparece um aviso com **Desfazer**, **Imprimir nota**, **Cupom 80 mm** e **WhatsApp**. O que acontece após a venda é configurável (Configurações).
 - **Digitou o código, já entrou**: leitor de código de barras adiciona na hora; `3x blusa` vende 3 de uma vez; produto não cadastrado pode ser cadastrado ali mesmo.
@@ -68,5 +73,5 @@ Dentro: `gestao.db`, `backups/`, `notas/`, `exportacoes/` e `logs/gestao.log`.
 ```
 src/GestaoComercial.Core   regras de negócio e SQLite (sem interface)
 src/GestaoComercial.App    telas (Avalonia)
-tests/GestaoComercial.Tests  156 testes: regras + interface renderizada em memória   →   dotnet test
+tests/GestaoComercial.Tests  167 testes: regras + interface renderizada em memória   →   dotnet test
 ```

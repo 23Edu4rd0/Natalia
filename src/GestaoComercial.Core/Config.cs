@@ -6,7 +6,7 @@ namespace GestaoComercial.Core;
 public static class Config
 {
     public const string NomeApp = "Gestão Comercial";
-    public const string Versao = "2.2.0";
+    public const string Versao = "2.3.0";
 
     /// <summary>Pasta de dados. Pode ser trocada com a variável de ambiente GESTAO_DATA_DIR.</summary>
     public static string PastaDados()

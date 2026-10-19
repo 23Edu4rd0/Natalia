@@ -28,14 +28,16 @@ public sealed class PainelTela : Tela
 
     public PainelTela(MainWindow app) : base(app)
     {
-        var cartoes = new UniformGrid { Rows = 1, Columns = 5 };
-        foreach (var c in Cartoes) { c.Margin = new Thickness(0, 0, 14, 0); cartoes.Children.Add(c); }
+        // sem custo no cadastro (modo simples) o "lucro" não seria confiável, então o cartão some
+        var cartoes = new UniformGrid { Rows = 1, Columns = App.Avancado ? 5 : 4 };
+        foreach (var c in Cartoes.Where(c => App.Avancado || c != lucro)) { c.Margin = new Thickness(0, 0, 14, 0); cartoes.Children.Add(c); }
 
         var atalhos = K.Linha(10,
             K.Botao("Nova venda", () => App.IrPara("Nova venda"), icone: "venda", classe: "primario"),
             K.Botao("Receber fiado", () => App.IrPara("A receber"), icone: "receber"),
-            K.Botao("Entrada de mercadorias", () => App.IrPara("Entrada de mercadorias"), icone: "entrada"),
-            K.Botao("Fechar caixa", () => App.IrPara("Caixa"), icone: "caixa"));
+            App.Avancado ? K.Botao("Entrada de mercadorias", () => App.IrPara("Entrada de mercadorias"), icone: "entrada")
+                         : K.Botao("Chegou mercadoria", () => { App.IrPara("Produtos"); _ = ((ProdutosTela)App.Telas["Produtos"]).ChegouMercadoriaAsync(); }, icone: "entrada"));
+        if (App.Avancado) atalhos.Children.Add(K.Botao("Fechar caixa", () => App.IrPara("Caixa"), icone: "caixa"));
         atalhos.Margin = new Thickness(0, 18, 0, 18);
 
         tBaixo = new Tabela(new Col("Produto", 200, Expande: true), new Col("Tipo", 120), new Col("Estoque", 105, true), new Col("Mín.", 80, true));

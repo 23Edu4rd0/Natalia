@@ -19,6 +19,8 @@ public sealed class ColecaoTelas : IReadOnlyDictionary<string, Tela>
 
     public void Adicionar(string nome, Func<Tela> fabrica) { nomes.Add(nome); fabricas[nome] = fabrica; }
     public bool JaCriada(string nome) => criadas.ContainsKey(nome);
+    /// <summary>Esquece as páginas já criadas (elas são refeitas ao abrir de novo), por exemplo ao trocar de modo.</summary>
+    public void Limpar() => criadas.Clear();
 
     public Tela this[string chave]
     {
@@ -44,11 +46,15 @@ public sealed class ColecaoTelas : IReadOnlyDictionary<string, Tela>
 /// <summary>Janela principal: menu lateral à esquerda, cabeçalho da página, a página atual e avisos rápidos.</summary>
 public sealed class MainWindow : JanelaBase
 {
-    sealed record ItemMenu(string Nome, Button Botao, Control IconeCtl);
+    sealed record ItemMenu(string Nome, Button Botao, Control IconeCtl, bool SoAvancado, TextBlock? Grupo);
 
     public Servico Svc { get; }
     public ColecaoTelas Telas { get; } = new();
     public string PaginaAtual { get; private set; } = "";
+    /// <summary>Chave da configuração "modo de uso": "simples" (padrão) ou "avancado".</summary>
+    public const string ConfigModo = "modo_interface";
+    /// <summary>Modo avançado mostra tudo (caixa, fornecedores, entradas, estoque, relatórios, custos...). O simples mostra só o necessário para vender.</summary>
+    public bool Avancado { get; private set; }
 
     readonly List<ItemMenu> menu = new();
     readonly ContentControl pagina = new();
@@ -59,19 +65,26 @@ public sealed class MainWindow : JanelaBase
     readonly Dictionary<string, (long Versao, DateTime Dia)> ultimaAtualizacao = new();
     long versaoEmpresa = -1;
 
+    /// <summary>Nomes dos itens do menu que aparecem no modo atual.</summary>
+    public IReadOnlyList<string> MenuVisivel => menu.Where(m => m.Botao.IsVisible).Select(m => m.Nome).ToList();
     public int ToastsAbertos => pilhaToasts.Children.Count;
 
     public MainWindow(Servico svc)
     {
         Svc = svc;
+        Avancado = svc.ObterConfig(ConfigModo, "simples") == "avancado";
         Title = $"{Config.NomeApp} {Config.Versao}";
         Width = 1280; Height = 800; MinWidth = 1100; MinHeight = 660;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         var barra = new StackPanel { Spacing = 3, Margin = new Thickness(12, 4, 12, 12) };
-        void Grupo(string nome) =>
-            barra.Children.Add(new TextBlock { Text = nome.ToUpperInvariant(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Cores.P("#818CF8"), Margin = new Thickness(14, 12, 0, 3) });
-        void Item(string nome, string icone, Func<Tela> fabrica, string? dica = null)
+        TextBlock? grupoAtual = null;
+        void Grupo(string nome)
+        {
+            grupoAtual = new TextBlock { Text = nome.ToUpperInvariant(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Cores.P("#818CF8"), Margin = new Thickness(14, 12, 0, 3) };
+            barra.Children.Add(grupoAtual);
+        }
+        void Item(string nome, string icone, Func<Tela> fabrica, string? dica = null, bool soAvancado = false)
         {
             Telas.Adicionar(nome, fabrica);
             var ic = Icones.Criar(icone, 20, "#A5B4FC");
@@ -81,25 +94,27 @@ public sealed class MainWindow : JanelaBase
             if (dica != null) ToolTip.SetTip(botao, dica);
             botao.Click += (_, _) => IrPara(nome);
             barra.Children.Add(botao);
-            menu.Add(new ItemMenu(nome, botao, ic));
+            menu.Add(new ItemMenu(nome, botao, ic, soAvancado, grupoAtual));
         }
 
         Item("Painel", "inicio", () => new PainelTela(this));
         Grupo("Vendas");
         Item("Nova venda", "venda", () => new VendaTela(this), "Atalho: F2");
         Item("Vendas", "notas", () => new NotasTela(this));
-        Item("Caixa", "caixa", () => new CaixaTela(this));
+        Item("Caixa", "caixa", () => new CaixaTela(this), soAvancado: true);
         Item("A receber", "receber", () => new ReceberTela(this));
         Grupo("Cadastros");
         Item("Clientes", "clientes", () => new ClientesTela(this));
         Item("Produtos", "produtos", () => new ProdutosTela(this));
-        Item("Fornecedores", "fornecedores", () => new FornecedoresTela(this));
+        Item("Fornecedores", "fornecedores", () => new FornecedoresTela(this), soAvancado: true);
         Grupo("Estoque");
-        Item("Estoque", "estoque", () => new EstoqueTela(this));
-        Item("Entrada de mercadorias", "entrada", () => new EntradasTela(this));
+        Item("Estoque", "estoque", () => new EstoqueTela(this), soAvancado: true);
+        Item("Entrada de mercadorias", "entrada", () => new EntradasTela(this), soAvancado: true);
         Grupo("Análise");
-        Item("Relatórios", "relatorios", () => new RelatoriosTela(this));
+        Item("Relatórios", "relatorios", () => new RelatoriosTela(this), soAvancado: true);
+        Grupo("Ajustes");
         Item("Configurações", "config", () => new ConfigTela(this));
+        AplicarMenu();
 
         // marca
         var logo = new Border
@@ -202,6 +217,29 @@ public sealed class MainWindow : JanelaBase
         while (pilhaToasts.Children.Count > 4) pilhaToasts.Children.RemoveAt(0);
         var espera = TimeSpan.FromSeconds(botoes is { Count: > 0 } ? Math.Max(segundos, 10) : segundos);
         Task.Delay(espera).ContinueWith(_ => Dispatcher.UIThread.Post(Remover), TaskScheduler.Default);
+    }
+
+    // ------------------------------------------------------------------ modo simples / avançado
+    /// <summary>Mostra no menu só o que o modo atual usa (grupos sem nenhum item visível também somem).</summary>
+    void AplicarMenu()
+    {
+        foreach (var m in menu) m.Botao.IsVisible = Avancado || !m.SoAvancado;
+        foreach (var g in menu.Where(m => m.Grupo != null).Select(m => m.Grupo!).Distinct())
+            g.IsVisible = menu.Any(m => m.Grupo == g && m.Botao.IsVisible);
+    }
+
+    /// <summary>Troca entre modo simples e avançado, na hora: o menu e as telas são refeitos.</summary>
+    public void DefinirModo(bool avancado)
+    {
+        if (avancado == Avancado) return;
+        Svc.SalvarConfig(ConfigModo, avancado ? "avancado" : "simples");
+        Avancado = avancado;
+        Telas.Limpar();
+        ultimaAtualizacao.Clear();
+        AplicarMenu();
+        var atual = PaginaAtual;
+        IrPara(Telas.ContainsKey(atual) ? atual : "Painel");
+        Plat.Atual.Toast(this, avancado ? "Modo avançado ligado: todas as funções estão no menu." : "Modo simples ligado: só o necessário para vender.", Nivel.Info, null, 5);
     }
 
     // ------------------------------------------------------------------ navegação

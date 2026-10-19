@@ -88,7 +88,7 @@ public sealed class ItemCarrinho
 public sealed class EditorItens : UserControl
 {
     readonly Servico svc;
-    readonly bool venda;
+    readonly bool venda, avancado;
     readonly Action? aoMudar;
     readonly List<ItemCarrinho> itens = new();
     Produto? produto;
@@ -106,9 +106,9 @@ public sealed class EditorItens : UserControl
 
     Window? Janela => TopLevel.GetTopLevel(this) as Window;
 
-    public EditorItens(Servico svc, bool venda, Action? aoMudar)
+    public EditorItens(Servico svc, bool venda, Action? aoMudar, bool avancado = true)
     {
-        this.svc = svc; this.venda = venda; this.aoMudar = aoMudar;
+        this.svc = svc; this.venda = venda; this.aoMudar = aoMudar; this.avancado = avancado;
 
         Busca = K.Caixa("", dica: "Digite o código, código de barras ou nome do produto");
         Busca.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -239,7 +239,7 @@ public sealed class EditorItens : UserControl
             else if (texto.Length > 0 && achados.Count == 0)
             {
                 if (!await Plat.Atual.Confirmar(Janela, "Produto não encontrado", $"Não encontrei “{texto}”.\n\nQuer cadastrar esse produto agora?")) return;
-                p = await Fluxos.NovoProdutoAsync(Janela, svc, texto);
+                p = await Fluxos.NovoProdutoAsync(Janela, svc, texto, avancado);
                 recemCadastrado = p != null;
             }
             else p = await SelecionarProdutoDialog.Abrir(Janela, svc, texto);

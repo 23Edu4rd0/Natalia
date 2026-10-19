@@ -24,6 +24,7 @@ public sealed class Valores
 {
     readonly Dictionary<string, object?> d = new();
     public object? this[string k] { get => d.GetValueOrDefault(k); set => d[k] = value; }
+    public bool Tem(string k) => d.ContainsKey(k);
     public string Texto(string k) => d.GetValueOrDefault(k) as string ?? "";
     public long Num(string k) => d.GetValueOrDefault(k) is long l ? l : 0;
     public long? Escolha(string k) => d.GetValueOrDefault(k) as long?;
@@ -55,6 +56,13 @@ public sealed class FormDialog : JanelaBase
     readonly TextBlock lblErro = new() { Foreground = Cores.P(Cores.Vermelho), TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13, IsVisible = false, Margin = new Thickness(0, 10, 0, 0) };
     /// <summary>Último erro de preenchimento mostrado dentro da janela (vazio se não há).</summary>
     public string Erro => lblErro.IsVisible ? lblErro.Text ?? "" : "";
+
+    /// <summary>Chaves dos campos mostrados, na ordem.</summary>
+    public IReadOnlyList<string> Chaves => campos.Select(c => c.Chave).ToList();
+
+    /// <summary>Valor escolhido em um campo de lista (null se nada escolhido ou se o campo não é uma lista).</summary>
+    public object? Valor(string chave) =>
+        controles[chave] is ComboBox co && co.SelectedIndex >= 0 ? campos.First(x => x.Chave == chave).Opcoes[co.SelectedIndex].Valor : null;
 
     /// <summary>Texto atual de um campo digitável.</summary>
     public string Texto(string chave) => controles[chave] is TextBox t ? t.Text ?? "" : "";

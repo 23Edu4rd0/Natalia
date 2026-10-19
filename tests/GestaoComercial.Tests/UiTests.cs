@@ -20,6 +20,9 @@ static class UiExt
         Ambiente.Rodar();
     }
 
+    public static Button? FindBotao(this Visual raiz, string texto) =>
+        raiz.GetVisualDescendants().OfType<Button>().FirstOrDefault(x => ((x.Tag as string) ?? (x.Content as string)) == texto && x.IsVisible);
+
     public static void Digitar(this TextBox t, string texto) { t.Text = texto; Ambiente.Rodar(); }
 }
 
