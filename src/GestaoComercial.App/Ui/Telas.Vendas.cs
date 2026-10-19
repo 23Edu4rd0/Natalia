@@ -10,8 +10,11 @@ namespace GestaoComercial.App.Ui;
 public sealed class VendaTela : Tela
 {
     const string Consumidor = "Consumidor final";
+    public const string ConfigAposVenda = "apos_venda";
 
-    public ComboBox Cliente { get; }
+    public AutoCompleteBox Cliente { get; }
+    /// <summary>Texto do cliente (vazio ou "Consumidor final" = sem cliente).</summary>
+    public string ClienteNome { get => (Cliente.Text ?? "").Trim(); set { Cliente.IsDropDownOpen = false; Cliente.SelectedItem = null; Cliente.Text = value; AtualizarInfoCliente(); } }
     public ComboBox Pagamento { get; }
     public EditorItens Editor { get; }
     public TextBox Desconto { get; }
@@ -21,25 +24,41 @@ public sealed class VendaTela : Tela
     readonly TextBlock lblDesc = K.Rotulo("Desconto", false, 13, Cores.Texto2), lblDescValor = K.Rotulo("", false, 13, Cores.Vermelho);
     readonly TextBlock lblTotal = K.Rotulo("R$ 0,00", true, 32, "#15803D");
     readonly TextBlock lblTroco = K.Rotulo("", true, 16);
+    readonly TextBlock lblClienteInfo = new() { FontSize = 12.5, TextWrapping = Avalonia.Media.TextWrapping.Wrap, IsVisible = false };
     readonly StackPanel painelTroco;
     readonly Grid linhaDesconto;
-    Dictionary<string, long?> clientes = new() { [Consumidor] = null };
+    Dictionary<string, long?> clientes = new();
+    bool finalizando;
 
     public string TextoTotal => "TOTAL: " + lblTotal.Text;
     public string TextoSubtotal => "Subtotal: " + lblSubValor.Text + (lblDescValor.Text?.Length > 0 ? "    Desconto: " + lblDescValor.Text : "");
     public string TextoTroco => lblTroco.Text ?? "";
+    public string TextoInfoCliente => lblClienteInfo.IsVisible ? lblClienteInfo.Text ?? "" : "";
     public bool TrocoVisivel => painelTroco.IsVisible;
 
     public override string Titulo => "Nova venda";
-    public override string Subtitulo => "Adicione os produtos, escolha como o cliente vai pagar e finalize.";
+    public override string Subtitulo => "Leia o código de barras ou busque o produto. Digite “3x nome” para vender 3 de uma vez.";
 
     public VendaTela(MainWindow app) : base(app)
     {
         Editor = new EditorItens(Svc, true, Recalcular);
 
-        Cliente = K.Combo(new[] { Consumidor }, double.NaN, Consumidor); Cliente.HorizontalAlignment = HorizontalAlignment.Stretch;
+        Cliente = new AutoCompleteBox
+        {
+            Watermark = "Consumidor final (ou busque)", MinimumPrefixLength = 0, MaxDropDownHeight = 260, FilterMode = AutoCompleteFilterMode.Custom,
+            HorizontalAlignment = HorizontalAlignment.Stretch, MinHeight = 38,
+            TextFilter = (busca, item) => string.IsNullOrWhiteSpace(busca) || Util.ChaveOrdenacao(item).Contains(Util.ChaveOrdenacao(busca.Trim())),
+        };
+        Cliente.GotFocus += (_, _) => { if (string.IsNullOrEmpty(Cliente.Text)) Cliente.IsDropDownOpen = true; };
+        Cliente.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != AutoCompleteBox.TextProperty) return;
+            // digitou algo diferente do cliente escolhido antes: a escolha antiga não pode "voltar" ao sair do campo
+            if (Cliente.SelectedItem is string s && !string.Equals(s, Cliente.Text, StringComparison.OrdinalIgnoreCase)) Cliente.SelectedItem = null;
+            AtualizarInfoCliente();
+        };
         Pagamento = K.Combo(Servico.FormasPagamento, double.NaN, Servico.FormasPagamento[0]); Pagamento.HorizontalAlignment = HorizontalAlignment.Stretch;
-        Pagamento.SelectionChanged += (_, _) => Recalcular();
+        Pagamento.SelectionChanged += (_, _) => { Recalcular(); AtualizarInfoCliente(); };
         Desconto = K.Caixa("", double.NaN, "0,00 ou 10%"); K.AoMudarTexto(Desconto, Recalcular);
         ValorRecebido = K.Caixa("", double.NaN, "Quanto o cliente entregou?"); K.AoMudarTexto(ValorRecebido, Recalcular);
         Obs = K.Caixa("", double.NaN, "Opcional");
@@ -48,10 +67,17 @@ public sealed class VendaTela : Tela
         var gCliente = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         K.ColocarNaGrade(gCliente, Cliente, 0, 0); K.ColocarNaGrade(gCliente, K.Margem(novoCliente, 8, 0, 0, 0), 0, 1);
 
+        Button Chip(string texto, Action acao) { var b = K.Botao(texto, acao, classe: "chip"); b.Margin = new Thickness(0, 0, 6, 0); b.MinHeight = 28; b.Padding = new Thickness(10, 3); return b; }
+        var chipsDesconto = new StackPanel { Orientation = Orientation.Horizontal, Children = { Chip("5%", () => Desconto.Text = "5%"), Chip("10%", () => Desconto.Text = "10%"), Chip("Sem desconto", () => Desconto.Text = "") } };
+        var chipsRecebido = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { Chip("Valor exato", () => ValorRecebido.Text = Util.FmtDinheiro(Editor.Total - SafeDesconto(), false)), Chip("R$ 20", () => ValorRecebido.Text = "20,00"), Chip("R$ 50", () => ValorRecebido.Text = "50,00"), Chip("R$ 100", () => ValorRecebido.Text = "100,00") },
+        };
         painelTroco = new StackPanel
         {
-            Spacing = 6, IsVisible = false,
-            Children = { K.Campo("Valor recebido", ValorRecebido), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { K.Rotulo("Troco:", false, 14, Cores.Texto2), lblTroco } } },
+            Spacing = 8, IsVisible = false,
+            Children = { K.Campo("Valor recebido", ValorRecebido), chipsRecebido, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { K.Rotulo("Troco:", false, 14, Cores.Texto2), lblTroco } } },
         };
 
         linhaDesconto = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), IsVisible = false };
@@ -70,9 +96,9 @@ public sealed class VendaTela : Tela
             Children =
             {
                 K.H2("Resumo da venda"),
-                K.Campo("Cliente", gCliente),
+                new StackPanel { Spacing = 6, Children = { K.Campo("Cliente", gCliente), lblClienteInfo } },
                 K.Campo("Forma de pagamento", Pagamento),
-                K.Campo("Desconto (R$ ou %)", Desconto),
+                new StackPanel { Spacing = 6, Children = { K.Campo("Desconto (R$ ou %)", Desconto), chipsDesconto } },
                 painelTroco,
                 K.Campo("Observações", Obs),
                 new Border { Height = 1, Background = Cores.P("#EEF0F5"), Margin = new Thickness(0, 2) },
@@ -92,27 +118,66 @@ public sealed class VendaTela : Tela
 
     public override void Atualizar()
     {
-        var sel = Cliente.SelectedItem as string ?? Consumidor;
-        clientes = new() { [Consumidor] = null };
+        var texto = ClienteNome;
+        clientes = new();
         foreach (var c in Svc.ListarPessoas(TipoPessoa.Cliente))
         {
             var nome = clientes.ContainsKey(c.Nome) ? $"{c.Nome} (#{c.Id})" : c.Nome; // homônimos: distingue pelo id
             clientes[nome] = c.Id;
         }
         Cliente.ItemsSource = clientes.Keys.ToList();
-        Cliente.SelectedItem = clientes.ContainsKey(sel) ? sel : Consumidor;
+        if (texto.Length > 0 && !clientes.Keys.Contains(texto, StringComparer.OrdinalIgnoreCase)) Cliente.Text = "";
         Editor.CarregarAtalhos();
         Recalcular();
+        AtualizarInfoCliente();
         Editor.Focar();
     }
 
+    /// <summary>Descobre quem é o cliente digitado. Vazio ou "Consumidor final" = sem cliente.</summary>
+    (long? Id, string Nome) ResolverCliente()
+    {
+        var t = ClienteNome;
+        if (t.Length == 0 || string.Equals(t, Consumidor, StringComparison.OrdinalIgnoreCase)) return (null, Consumidor);
+        var achado = clientes.FirstOrDefault(c => string.Equals(c.Key, t, StringComparison.OrdinalIgnoreCase));
+        if (achado.Key == null)
+        {
+            var parecidos = clientes.Where(c => Util.ChaveOrdenacao(c.Key).Contains(Util.ChaveOrdenacao(t))).ToList();
+            if (parecidos.Count == 1) achado = parecidos[0];
+            else throw new ValidacaoException($"Não encontrei o cliente “{t}”. Escolha um da lista ou clique em “Novo” para cadastrar.");
+        }
+        return (achado.Value, achado.Key);
+    }
+
+    void AtualizarInfoCliente()
+    {
+        var t = ClienteNome;
+        var fiado = (Pagamento?.SelectedItem as string) == Servico.Fiado;
+        string? msg = null; var cor = Cores.Texto2;
+        if (t.Length == 0 || string.Equals(t, Consumidor, StringComparison.OrdinalIgnoreCase))
+        { if (fiado) { msg = "Para vender no fiado, escolha o cliente."; cor = Cores.Ambar; } }
+        else
+        {
+            var achado = clientes.FirstOrDefault(c => string.Equals(c.Key, t, StringComparison.OrdinalIgnoreCase));
+            if (achado.Key == null) { if (!clientes.Keys.Any(k => Util.ChaveOrdenacao(k).Contains(Util.ChaveOrdenacao(t)))) { msg = "Cliente não encontrado. Clique em “Novo” para cadastrar."; cor = Cores.Ambar; } }
+            else if (achado.Value is long id)
+            {
+                var saldo = Svc.SaldoCliente(id);
+                if (saldo > 0) { msg = $"Esse cliente já deve {Util.FmtDinheiro(saldo)} no fiado."; cor = Cores.Ambar; }
+                else if (fiado) { msg = "Sem dívida no fiado."; cor = Cores.Verde; }
+            }
+        }
+        lblClienteInfo.IsVisible = msg != null;
+        lblClienteInfo.Text = msg ?? "";
+        lblClienteInfo.Foreground = Cores.P(cor);
+    }
+
     long LerDesconto() => Util.ParseDesconto(Desconto.Text, Editor.Total);
+    long SafeDesconto() { try { return Math.Min(LerDesconto(), Editor.Total); } catch (ValidacaoException) { return 0; } }
 
     void Recalcular()
     {
         var sub = Editor.Total;
-        long desc;
-        try { desc = Math.Min(LerDesconto(), sub); } catch (ValidacaoException) { desc = 0; } // ainda digitando
+        var desc = SafeDesconto();   // enquanto digita, valor inválido conta como zero
         var total = sub - desc;
         lblSubValor.Text = Util.FmtDinheiro(sub);
         linhaDesconto.IsVisible = desc > 0;
@@ -136,7 +201,7 @@ public sealed class VendaTela : Tela
 
     void LimparTudo()
     {
-        Editor.Limpar(); Desconto.Text = ""; Obs.Text = ""; ValorRecebido.Text = ""; Cliente.SelectedItem = Consumidor;
+        Editor.Limpar(); Desconto.Text = ""; Obs.Text = ""; ValorRecebido.Text = ""; Cliente.Text = ""; Pagamento.SelectedIndex = 0;
     }
 
     public async Task NovoClienteAsync()
@@ -145,32 +210,73 @@ public sealed class VendaTela : Tela
         if (id == null) return;
         Atualizar();
         var nome = clientes.FirstOrDefault(c => c.Value == id).Key;
-        if (nome != null) Cliente.SelectedItem = nome;
+        if (nome != null) ClienteNome = nome;
     }
 
     /// <summary>Atalho F9.</summary>
     public void Finalizar() => SeguroAsync(FinalizarAsync)();
 
+    /// <summary>
+    /// Registra a venda direto, sem janela de confirmação (o aviso traz o botão Desfazer).
+    /// O que acontece depois (imprimir, cupom...) vem da opção escolhida em Configurações.
+    /// </summary>
     public async Task FinalizarAsync()
     {
+        if (finalizando) return;     // duplo clique / F9 repetido não registra duas vezes
         var itens = Editor.ParaVenda();
-        if (itens.Count == 0) { await Info("Adicione ao menos um produto à venda.", "Venda"); return; }
+        if (itens.Count == 0) { Plat.Atual.Toast(Janela, "Adicione ao menos um produto à venda.", Nivel.Aviso); return; }
         var desconto = LerDesconto();
         var total = Editor.Total - desconto;
         if (total < 0) throw new ValidacaoException("O desconto não pode ser maior que o subtotal da venda.");
-        var cliente = Cliente.SelectedItem as string ?? Consumidor;
+        var (clienteId, clienteNome) = ResolverCliente();
         var forma = Pagamento.SelectedItem as string ?? Servico.FormasPagamento[0];
-        if (forma == Servico.Fiado && clientes.GetValueOrDefault(cliente) == null)
-            throw new ValidacaoException("Venda no fiado precisa de um cliente. Escolha o cliente ou clique em \"Novo\" para cadastrar.");
-        if (!await Confirmar($"Confirmar venda?\n\nCliente: {cliente}\nItens: {itens.Count}\nTotal: {Util.FmtDinheiro(total)}\nPagamento: {forma}"))
-            return;
-        var vid = Svc.RegistrarVenda(itens, clientes.GetValueOrDefault(cliente), desconto, forma, Obs.Text);
-        var trocoTexto = painelTroco.IsVisible && lblTroco.Foreground == Cores.P(Cores.Verde) ? $"\nTroco: {lblTroco.Text}" : "";
+        if (forma == Servico.Fiado && clienteId == null)
+            throw new ValidacaoException("Venda no fiado precisa de um cliente. Escolha o cliente ou clique em “Novo” para cadastrar.");
+        var troco = painelTroco.IsVisible && lblTroco.Foreground == Cores.P(Cores.Verde) ? $"  ·  Troco {lblTroco.Text}" : "";
+
+        long vid;
+        finalizando = true;
+        try { vid = Svc.RegistrarVenda(itens, clienteId, desconto, forma, Obs.Text); }
+        finally { finalizando = false; }
         LimparTudo();
         AtualizarTudo();
-        if (await Confirmar($"Venda registrada com sucesso!\nNota nº {vid:000000} — {Util.FmtDinheiro(total)}{trocoTexto}\n\nDeseja abrir a nota para imprimir / salvar em PDF?", "Venda registrada"))
-            NotaDialog.AbrirNoNavegador(Janela, Svc.ObterVenda(vid));
         Editor.Focar();
+
+        var venda = Svc.ObterVenda(vid);
+        var titulo = $"Venda {vid:000000} registrada — {Util.FmtDinheiro(total)}{troco}";
+        var desfazer = ("Desfazer", (Action)(() => Desfazer(vid)));
+        var modo = Svc.ObterConfig(ConfigAposVenda, "aviso");
+        switch (modo)
+        {
+            case "perguntar":
+                if (await Confirmar($"{titulo}\n\nDeseja abrir a nota para imprimir / salvar em PDF?", "Venda registrada")) NotaDialog.AbrirNoNavegador(Janela, venda);
+                break;
+            case "cupom":
+                NotaDialog.AbrirNoNavegador(Janela, venda, cupom: true);
+                Plat.Atual.Toast(Janela, titulo, Nivel.Info, new[] { desfazer }, 8);
+                break;
+            case "nada":
+                Plat.Atual.Toast(Janela, titulo, Nivel.Info, new[] { desfazer }, 8);
+                break;
+            default:
+                var botoes = new List<(string, Action)>
+                {
+                    ("Imprimir nota", () => NotaDialog.AbrirNoNavegador(Janela, venda)),
+                    ("Cupom 80 mm", () => NotaDialog.AbrirNoNavegador(Janela, venda, cupom: true)),
+                };
+                var tel = clienteId is long cid ? Svc.ObterPessoa(TipoPessoa.Cliente, cid).Telefone : "";
+                if (tel.Length > 0) botoes.Add(("WhatsApp", () => _ = Fluxos.WhatsAppAsync(Janela, tel, Nota.TextoWhatsApp(venda))));
+                botoes.Add(desfazer);
+                Plat.Atual.Toast(Janela, titulo, Nivel.Info, botoes, 10);
+                break;
+        }
+    }
+
+    void Desfazer(long vid)
+    {
+        Svc.CancelarVenda(vid, "Desfeita logo após o registro");
+        AtualizarTudo();
+        Plat.Atual.Toast(Janela, $"Venda {vid:000000} desfeita. Os produtos voltaram ao estoque.");
     }
 }
 
@@ -213,7 +319,7 @@ public sealed class NotasTela : Tela
         Tabela = new Tabela(new Col("Nota", 90), new Col("Data", 160), new Col("Cliente", 240, Expande: true), new Col("Pagamento", 150),
                             new Col("Desconto", 100, true), new Col("Total", 120, true), new Col("Situação", 120, Chip: true));
         rodape.HorizontalAlignment = HorizontalAlignment.Right; rodape.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(new StackPanel { Children = { filtros, acoes } }, Tabela, rodape);
+        Content = K.Doca(new StackPanel { Children = { filtros, acoes } }, Tabela.ComVazio("Nenhuma venda neste período.\nAltere as datas acima ou faça uma venda em “Nova venda”."), rodape);
         Tabela.Duplo += SeguroAsync(VisualizarAsync);
     }
 
@@ -259,24 +365,24 @@ public sealed class NotasTela : Tela
     {
         var vid = Exigir(Tabela.IdLong, "uma nota");
         var v = Svc.ObterVenda(vid);
-        if (v.Cancelada) { await Info("Esta venda já está cancelada.", "Cancelar"); return; }
+        if (v.Cancelada) { Dica("Esta venda já está cancelada."); return; }
         var motivo = await Plat.Atual.Perguntar(Janela, "Cancelar venda",
             $"Cancelar a nota {vid:000000} ({Util.FmtDinheiro(v.Total)})?\nOs produtos voltam ao estoque.\n\nInforme o motivo:");
         if (motivo == null) return;
         Svc.CancelarVenda(vid, motivo);
         AtualizarTudo();
-        await Info($"Nota {vid:000000} cancelada e estoque restaurado.");
+        Sucesso($"Nota {vid:000000} cancelada e estoque restaurado.");
     }
 
     public async Task ExportarAsync()
     {
         var vendas = Buscar(100000);
-        if (vendas.Count == 0) { await Info("Não há vendas no período para exportar.", "Exportar"); return; }
+        if (vendas.Count == 0) { Dica("Não há vendas no período para exportar."); return; }
         var caminho = await Plat.Atual.SalvarArquivo(Janela, "Exportar vendas", Config.Subpasta("exportacoes"), "vendas.csv", "CSV (Excel)", "csv");
         if (caminho == null) return;
         var n = Util.ExportarCsv(caminho, new[] { "Nota", "Data", "Cliente", "CPF/CNPJ", "Pagamento", "Subtotal", "Desconto", "Total", "Situação" },
             vendas.Select(v => new object?[] { $"{v.Id:000000}", Util.FmtData(v.Data), v.ClienteNome, v.ClienteDoc, v.FormaPagamento,
                                                Util.FmtDinheiro(v.Subtotal, false), Util.FmtDinheiro(v.Desconto, false), Util.FmtDinheiro(v.Total, false), v.Status }));
-        await Info($"{n} venda(s) exportada(s) para:\n{caminho}", "Exportado");
+        Sucesso($"{n} venda(s) exportada(s).", ("Abrir arquivo", () => Plat.Atual.Abrir(caminho)));
     }
 }

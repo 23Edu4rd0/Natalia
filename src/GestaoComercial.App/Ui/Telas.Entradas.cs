@@ -54,18 +54,18 @@ public sealed class EntradasTela : Tela
 
     public async Task RegistrarAsync()
     {
-        if (fornecedores.Count == 0) { await Info("Cadastre um fornecedor primeiro (aba Fornecedores).", "Entrada"); return; }
+        if (fornecedores.Count == 0) { Dica("Cadastre um fornecedor primeiro (página Fornecedores)."); return; }
         var nome = Fornecedor.SelectedItem as string;
-        if (nome == null) { await Info("Selecione o fornecedor.", "Entrada"); return; }
+        if (nome == null) { Dica("Selecione o fornecedor."); Fornecedor.Focus(); return; }
         var itens = Editor.ParaEntrada();
-        if (itens.Count == 0) { await Info("Adicione ao menos um produto.", "Entrada"); return; }
+        if (itens.Count == 0) { Dica("Adicione ao menos um produto."); return; }
         var data = Util.ParseDataBr(Data.Text, "Data da entrada");
         if (!await Confirmar($"Registrar entrada de {itens.Count} produto(s) de '{nome}'?\nTotal: {Util.FmtDinheiro(Editor.Total)}\n\nO estoque e o preço de custo dos produtos serão atualizados."))
             return;
         var eid = Svc.RegistrarEntrada(fornecedores[nome], itens, Documento.Text, Obs.Text, data);
         Editor.Limpar(); Documento.Text = ""; Obs.Text = ""; Data.Text = Util.HojeBr();
         AtualizarTudo();
-        await Info($"Entrada nº {eid:000000} registrada. Estoque atualizado.");
+        Sucesso($"Entrada nº {eid:000000} registrada. Estoque atualizado.");
     }
 
     public Task HistoricoAsync() => HistoricoEntradasDialog.Abrir(Janela, Svc, App);

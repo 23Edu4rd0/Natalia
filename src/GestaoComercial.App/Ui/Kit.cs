@@ -84,6 +84,23 @@ public sealed class Tabela : DataGrid
 
     public event Action? Duplo;
     public IReadOnlyList<Linha> Linhas { get; private set; } = Array.Empty<Linha>();
+    TextBlock? vazio;
+
+    /// <summary>Mensagem amigável mostrada no meio da tabela quando não há linhas.</summary>
+    public string TextoVazio { get => vazio?.Text ?? ""; set { if (vazio != null) vazio.Text = value; } }
+
+    /// <summary>Devolve a tabela envolvida num painel que mostra <paramref name="texto"/> quando a lista está vazia.</summary>
+    public Control ComVazio(string texto)
+    {
+        vazio = new TextBlock
+        {
+            Text = texto, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 420, Foreground = Cores.P("#9CA3AF"), FontSize = 14,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 38, 0, 0), IsHitTestVisible = false,
+            IsVisible = Linhas.Count == 0,
+        };
+        return new Grid { Children = { this, vazio } };
+    }
+    public bool VazioVisivel => vazio?.IsVisible == true;
 
     static (string Fundo, string Texto) CorChip(string t) => t switch
     {
@@ -176,6 +193,7 @@ public sealed class Tabela : DataGrid
         var lista = linhas.ToList();
         Linhas = lista;
         ItemsSource = lista;
+        if (vazio != null) vazio.IsVisible = lista.Count == 0;
         if (sel != null) SelectedItem = lista.FirstOrDefault(x => x.Id == sel);
     }
 
@@ -192,6 +210,22 @@ public static class K
         if (tamanho != null) t.FontSize = tamanho.Value;
         if (cor != null) t.Foreground = Cores.P(cor);
         return t;
+    }
+
+    /// <summary>Atraso (ms) antes de buscar enquanto a pessoa digita. 0 = imediato (usado nos testes).</summary>
+    public static int DebounceMs = 180;
+
+    /// <summary>Evita refazer a consulta a cada tecla: só executa quando a pessoa para de digitar.</summary>
+    public static Action Debounce(Action acao)
+    {
+        CancellationTokenSource? cts = null;
+        return () =>
+        {
+            if (DebounceMs <= 0) { acao(); return; }
+            cts?.Cancel();
+            var meu = cts = new CancellationTokenSource();
+            Task.Delay(DebounceMs, meu.Token).ContinueWith(t => { if (!t.IsCanceled) Avalonia.Threading.Dispatcher.UIThread.Post(acao); }, TaskScheduler.Default);
+        };
     }
 
     public static TextBlock Discreto(string texto) { var t = Rotulo(texto); t.Classes.Add("sub"); return t; }
@@ -344,6 +378,13 @@ public abstract class Tela : UserControl
     protected Task Info(string texto, string titulo = "Pronto") => Plat.Atual.Mensagem(Janela, titulo, texto, Nivel.Info);
     protected Task Aviso(string texto, string titulo = "Atenção") => Plat.Atual.Mensagem(Janela, titulo, texto, Nivel.Aviso);
     protected Task<bool> Confirmar(string texto, string titulo = "Confirmar") => Plat.Atual.Confirmar(Janela, titulo, texto);
+
+    /// <summary>Aviso de sucesso que some sozinho (com botões opcionais).</summary>
+    protected void Sucesso(string texto, params (string Rotulo, Action Acao)[] acoes) =>
+        Plat.Atual.Toast(Janela, texto, Nivel.Info, acoes.Length > 0 ? acoes : null, 6);
+
+    /// <summary>Aviso leve (sem janela) para situações simples, como "adicione um produto".</summary>
+    protected void Dica(string texto) => Plat.Atual.Toast(Janela, texto, Nivel.Aviso);
 
     /// <summary>Atualiza a página atual (usado depois de operações que mudam estoque/vendas).</summary>
     protected void AtualizarTudo() => App.AtualizarTudo();

@@ -34,7 +34,7 @@ public class UiNovasTests
         v.Clicar("Finalizar venda e emitir nota");                                  // sem cliente: bloqueia
         Assert.Contains("precisa de um cliente", a.P.Ultima.Texto);
         Assert.Empty(a.S.ListarVendas());
-        v.Cliente.SelectedItem = "Maria Silva";
+        v.ClienteNome = "Maria Silva";
         await v.FinalizarAsync();
         Assert.Equal(10000, a.S.SaldoCliente(maria));
 
@@ -45,7 +45,7 @@ public class UiNovasTests
         // pagamento maior que a dívida é recusado e o formulário continua aberto
         await a.ComDialogo<FormDialog>(r.ReceberAsync, d =>
         {
-            d.Definir("valor", "150,00"); Assert.False(d.Salvar()); Assert.Contains("maior que a dívida", a.P.Ultima.Texto);
+            d.Definir("valor", "150,00"); Assert.False(d.Salvar()); Assert.Contains("maior que a dívida", d.Erro);
             d.Definir("valor", "40,00"); d.Definir("forma", "Pix"); Assert.True(d.Salvar());
         });
         Assert.Equal(6000, a.S.SaldoCliente(maria)); Assert.Equal("R$ 60,00", r.Total.Valor);
@@ -112,7 +112,7 @@ public class UiNovasTests
         a.Foto("venda_troco");
         a.P.Confirmacoes.Clear(); await v.FinalizarAsync();
         Assert.Equal(9000, Assert.Single(a.S.ListarVendas()).Total);
-        Assert.Contains("Troco: R$ 10,00", a.P.Confirmacoes[^1]);            // aparece na mensagem final
+        Assert.Contains("Troco R$ 10,00", a.P.UltimoToast.Texto);              // aparece no aviso da venda
     }
 
     [AvaloniaFact]
@@ -143,7 +143,7 @@ public class UiNovasTests
             d.Definir("nome", ""); Assert.False(d.Salvar());                         // nome obrigatório
             d.Definir("nome", "Cliente Novo"); d.Definir("telefone", "(11) 90000-0000"); Assert.True(d.Salvar());
         });
-        Assert.Equal("Cliente Novo", v.Cliente.SelectedItem);                        // já vem selecionado
+        Assert.Equal("Cliente Novo", v.ClienteNome);                        // já vem selecionado
         Assert.Equal("(11) 90000-0000", a.S.ListarPessoas(TipoPessoa.Cliente)[0].Telefone);
     }
 
@@ -160,7 +160,7 @@ public class UiNovasTests
         // F9 numa venda vazia: avisa que falta produto (e não quebra)
         a.Janela.IrPara("Nova venda"); a.P.Msgs.Clear();
         a.Janela.KeyPressQwerty(PhysicalKey.F9, RawInputModifiers.None); Ambiente.Rodar();
-        Assert.Contains("Adicione ao menos um produto", a.P.Ultima.Texto);
+        Assert.Contains("Adicione ao menos um produto", a.P.UltimoToast.Texto);
     }
 
     // ------------------------------------------------------------------ caixa
@@ -175,7 +175,7 @@ public class UiNovasTests
         await a.ComDialogo<FormDialog>(() => c.RegistrarAsync("SUPRIMENTO"), d => { d.Definir("valor", "100,00"); d.Definir("motivo", "troco inicial"); Assert.True(d.Salvar()); });
         await a.ComDialogo<FormDialog>(() => c.RegistrarAsync("SANGRIA"), d =>
         {
-            d.Definir("valor", "20,00"); Assert.False(d.Salvar()); Assert.Contains("Motivo", a.P.Ultima.Texto);   // retirada exige motivo
+            d.Definir("valor", "20,00"); Assert.False(d.Salvar()); Assert.Contains("Motivo", d.Erro);   // retirada exige motivo
             d.Definir("motivo", "pagar entregador"); Assert.True(d.Salvar());
         });
         Assert.Equal("R$ 140,00", c.Gaveta.Valor);          // 100 + 60 (dinheiro) - 20
@@ -201,7 +201,7 @@ public class UiNovasTests
         var t = a.Tela<ProdutosTela>("Produtos");
         await a.ComDialogo<FormDialog>(t.ReajustarAsync, d =>
         {
-            d.Definir("pct", "abc"); Assert.False(d.Salvar()); Assert.Contains("inválida", a.P.Ultima.Texto);
+            d.Definir("pct", "abc"); Assert.False(d.Salvar()); Assert.Contains("inválida", d.Erro);
             d.Definir("pct", "0"); Assert.False(d.Salvar());
             d.Definir("tipo", "Roupas"); d.Definir("pct", "10"); Assert.True(d.Salvar());
         });

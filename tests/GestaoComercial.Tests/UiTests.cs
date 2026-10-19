@@ -54,8 +54,8 @@ public class UiTests
         {
             d.Definir("nome", "Água mineral 500ml"); d.Definir("venda", "abc");
             Assert.False(d.Salvar());                                   // dado inválido: o formulário NÃO fecha
-            Assert.Contains("inválido", a.P.Ultima.Texto);
-            Assert.Equal(Nivel.Aviso, a.P.Ultima.Nivel);
+            Assert.Contains("inválido", d.Erro);                         // e o erro aparece dentro dele, sem abrir outra janela
+            Assert.Empty(a.P.Msgs);
             a.Foto("form_erro", d);
             d.Definir("venda", "2,50"); d.Definir("custo", "1,20"); d.Definir("inicial", "50"); d.Definir("minimo", "10"); d.Definir("categoria", "Bebidas");
             Assert.True(d.Salvar());
@@ -73,7 +73,7 @@ public class UiTests
         await a.ComDialogo<FormDialog>(t.NovoAsync, d =>
         {
             Assert.False(d.Salvar());
-            Assert.Contains("Nome do produto", a.P.Ultima.Texto);
+            Assert.Contains("Nome do produto", d.Erro);
             d.Close();
         });
         Assert.Empty(a.S.ListarProdutos());
@@ -138,16 +138,16 @@ public class UiTests
         await a.ComDialogo<FormDialog>(t.NovoAsync, d =>
         {
             d.Definir("nome", "Fulano"); d.Definir("documento", "111.111.111-11");
-            Assert.False(d.Salvar()); Assert.Contains("CPF inválido", a.P.Ultima.Texto);
+            Assert.False(d.Salvar()); Assert.Contains("CPF inválido", d.Erro);
             d.Definir("documento", "529.982.247-25"); d.Definir("email", "sem-arroba");
-            Assert.False(d.Salvar()); Assert.Contains("E-mail inválido", a.P.Ultima.Texto);
+            Assert.False(d.Salvar()); Assert.Contains("E-mail inválido", d.Erro);
             d.Definir("email", "fulano@ex.com");
             Assert.True(d.Salvar());
         });
         await a.ComDialogo<FormDialog>(t.NovoAsync, d =>
         {
             d.Definir("nome", "Outro"); d.Definir("documento", "52998224725");
-            Assert.False(d.Salvar()); Assert.Contains("Já existe um cliente", a.P.Ultima.Texto);
+            Assert.False(d.Salvar()); Assert.Contains("Já existe um cliente", d.Erro);
             d.Close();
         });
         Assert.Single(a.S.ListarPessoas(TipoPessoa.Cliente));
@@ -211,9 +211,9 @@ public class UiTests
     {
         using var a = new Ambiente(); a.Janela.Show(); Semear(a.S);
         var t = a.Tela<EntradasTela>("Entrada de mercadorias");
-        await t.RegistrarAsync(); Assert.Equal("Selecione o fornecedor.", a.P.Ultima.Texto);
+        await t.RegistrarAsync(); Assert.Equal("Selecione o fornecedor.", a.P.UltimoToast.Texto); Assert.Equal(Nivel.Aviso, a.P.UltimoToast.Nivel);
         t.Fornecedor.SelectedItem = "Distribuidora Alfa Ltda";
-        await t.RegistrarAsync(); Assert.Equal("Adicione ao menos um produto.", a.P.Ultima.Texto);
+        await t.RegistrarAsync(); Assert.Equal("Adicione ao menos um produto.", a.P.UltimoToast.Texto);
         t.Editor.Busca.Digitar(Pid(a.S, "Caneta") is var id ? a.S.ObterProduto(id).Codigo : ""); await t.Editor.BuscarAsync(); await t.Editor.AdicionarAsync();
         t.Data.Digitar("31/02/2026"); await Assert.ThrowsAsync<ValidacaoException>(t.RegistrarAsync);
         t.Data.Digitar("01/01/2999"); await Assert.ThrowsAsync<ValidacaoException>(t.RegistrarAsync);
@@ -246,26 +246,33 @@ public class UiTests
     {
         using var a = new Ambiente(); a.Janela.Show(); Semear(a.S);
         var t = a.Tela<VendaTela>("Nova venda");
-        t.Cliente.SelectedItem = "Maria Silva"; t.Pagamento.SelectedItem = "Pix";
+        t.ClienteNome = "Maria Silva"; t.Pagamento.SelectedItem = "Pix";
         var ed = t.Editor;
-        ed.Busca.Digitar(a.S.ObterProduto(Pid(a.S, "Refrigerante")).Codigo); await ed.BuscarAsync();   // código exato
-        ed.Quantidade.Digitar("3"); await ed.AdicionarAsync();
+        ed.Quantidade.Digitar("3");
+        ed.Busca.Digitar(a.S.ObterProduto(Pid(a.S, "Refrigerante")).Codigo); await ed.BuscarAsync();   // código exato (leitor): já entra no carrinho, 3 unidades
+        Assert.Equal(("Refrigerante 2L", 3L), (ed.Itens[0].Nome, ed.Itens[0].Quantidade));
         ed.Busca.Digitar("Caderno"); await ed.BuscarAsync(); ed.Quantidade.Digitar("2"); await ed.AdicionarAsync();
         ed.Busca.Digitar("Água"); await ed.BuscarAsync(); ed.Quantidade.Digitar("999");
         var ex = await Assert.ThrowsAsync<ValidacaoException>(ed.AdicionarAsync);                    // estoque insuficiente (checagem na tela)
         Assert.Contains("Estoque insuficiente", ex.Message);
-        ed.Busca.Digitar("zzzz"); await ed.BuscarAsync();                                            // nada encontrado
-        Assert.Equal(Nivel.Info, a.P.Ultima.Nivel); Assert.Contains("Nenhum produto", a.P.Ultima.Texto);
+        a.P.RespostaConfirmar = false;
+        ed.Busca.Digitar("zzzz"); await ed.BuscarAsync();                                            // nada encontrado: oferece cadastrar (e a pessoa recusa)
+        Assert.Contains("Quer cadastrar esse produto agora?", a.P.Confirmacoes[^1]);
+        a.P.RespostaConfirmar = true;
         Assert.Null(ed.ProdutoSelecionado);                                                          // editar a busca descarta a escolha anterior
         t.Desconto.Digitar("2,00");
         Assert.Equal("TOTAL: R$ 49,30", t.TextoTotal);
         a.Foto("venda");
-        a.P.Msgs.Clear(); a.P.Abertos.Clear();
+        a.P.Msgs.Clear(); a.P.Abertos.Clear(); a.P.Confirmacoes.Clear();
         await t.FinalizarAsync();
         var v = Assert.Single(a.S.ListarVendas());
+        Assert.Empty(a.P.Confirmacoes);                               // sem janela de confirmação: vende direto
         Assert.Equal((4930L, "Maria Silva", "Pix"), (v.Total, v.ClienteNome, v.FormaPagamento));
         Assert.Equal(21, a.S.ObterProduto(Pid(a.S, "Refrigerante")).Estoque);
-        Assert.Single(a.P.Abertos);                                   // nota aberta no navegador
+        Assert.Contains($"Venda {v.Id:000000} registrada", a.P.UltimoToast.Texto);
+        Assert.Empty(a.P.Abertos);                                    // nada abre sozinho; os botões do aviso fazem isso
+        a.P.ClicarToast("Imprimir nota");
+        Assert.Single(a.P.Abertos);
         Assert.EndsWith($"nota-{v.Id:000000}.html", a.P.Abertos[0]);
         Assert.True(File.Exists(a.P.Abertos[0]));
         Assert.Empty(ed.Itens);                                       // carrinho limpo
@@ -291,14 +298,13 @@ public class UiTests
     {
         using var a = new Ambiente(); a.Janela.Show(); Semear(a.S);
         var t = a.Tela<VendaTela>("Nova venda");
-        await t.FinalizarAsync(); Assert.Contains("ao menos um produto", a.P.Ultima.Texto);
+        await t.FinalizarAsync(); Assert.Contains("ao menos um produto", a.P.UltimoToast.Texto);
         await Assert.ThrowsAsync<ValidacaoException>(t.Editor.AdicionarAsync);                 // sem produto escolhido
         t.Editor.Busca.Digitar("Caneta"); await t.Editor.BuscarAsync(); await t.Editor.AdicionarAsync();
         t.Desconto.Digitar("999,00"); await Assert.ThrowsAsync<ValidacaoException>(t.FinalizarAsync);
         t.Desconto.Digitar("abc"); await Assert.ThrowsAsync<ValidacaoException>(t.FinalizarAsync);
         Assert.Equal("TOTAL: R$ 2,50", t.TextoTotal);   // desconto inválido enquanto digita não quebra o total
-        t.Desconto.Digitar(""); a.P.RespostaConfirmar = false; await t.FinalizarAsync();
-        Assert.Empty(a.S.ListarVendas());               // usuário disse "Não"
+        Assert.Empty(a.S.ListarVendas());               // nada foi registrado pelas tentativas inválidas
     }
 
     [AvaloniaFact]
@@ -360,7 +366,7 @@ public class UiTests
         a.P.RespostaPergunta = null; await t.CancelarAsync(); Assert.Equal("CONCLUIDA", a.S.ObterVenda(vid).Status);   // desistiu do motivo
         a.P.RespostaPergunta = "cliente desistiu"; await t.CancelarAsync();
         Assert.True(a.S.ObterVenda(vid).Cancelada); Assert.Equal(24, a.S.ObterProduto(pid).Estoque);
-        a.P.Msgs.Clear(); await t.CancelarAsync(); Assert.Contains("já está cancelada", a.P.Ultima.Texto);
+        await t.CancelarAsync(); Assert.Contains("já está cancelada", a.P.UltimoToast.Texto);
         t.Situacao.SelectedItem = "Canceladas"; Ambiente.Rodar(); Assert.Single(t.Tabela.Linhas);
         a.Foto("notas_cancelada");
     }
@@ -406,7 +412,7 @@ public class UiTests
         await a.ComDialogo<FormDialog>(t.AjustarAsync, d =>
         {
             d.Definir("nova", "100"); d.Definir("motivo", "igual");
-            Assert.False(d.Salvar()); Assert.Contains("Nada a ajustar", a.P.Ultima.Texto);
+            Assert.False(d.Salvar()); Assert.Contains("Nada a ajustar", d.Erro);
             d.Definir("nova", "-1"); Assert.False(d.Salvar());
             d.Close();
         });
@@ -443,7 +449,7 @@ public class UiTests
         c.Documento.Digitar("11.222.333/0001-82"); c.Clicar("Salvar dados da empresa"); Assert.Contains("CNPJ inválido", a.P.Ultima.Texto);
         c.Documento.Digitar("11.222.333/0001-81"); c.Nome.Digitar(""); c.Clicar("Salvar dados da empresa"); Assert.Contains("Informe o nome da empresa", a.P.Ultima.Texto);
         c.Nome.Digitar("Loja Nova"); c.Clicar("Salvar dados da empresa");
-        Assert.Equal("Loja Nova", a.S.ObterEmpresa().Nome); Assert.Equal("Dados da empresa salvos. As próximas notas já sairão com eles.", a.P.Ultima.Texto);
+        Assert.Equal("Loja Nova", a.S.ObterEmpresa().Nome); Assert.Equal("Dados da loja salvos. As próximas notas já saem com eles.", a.P.UltimoToast.Texto);
         a.Foto("config");
         var bk = Path.Combine(a.Pasta, "bk", "copia.db"); a.P.ArquivoParaSalvar = bk;
         await c.BackupAsync(); Assert.True(File.Exists(bk));

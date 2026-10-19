@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -43,7 +44,7 @@ public sealed class SelecionarProdutoDialog : JanelaBase
         var doca = K.Doca(topo, tabela, barra); doca.Margin = new Thickness(16);
         Content = doca;
 
-        K.AoMudarTexto(busca, Carregar);
+        K.AoMudarTexto(busca, K.Debounce(Carregar));
         tabela.Duplo += Escolher;
         K.AoApertarEnter(busca, Escolher);
         busca.KeyDown += (_, e) => { if (e.Key == Key.Down) { tabela.Focus(); e.Handled = true; } };
@@ -217,22 +218,35 @@ public sealed class EditorItens : UserControl
         }
     }
 
+    static readonly Regex QuantidadeNaBusca = new(@"^(\d{1,4})\s*[*xX]\s*(\S.*)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Busca por código ou nome. Atalhos: "3x camiseta" já define a quantidade; na venda, ler um código de barras exato
+    /// adiciona o produto direto; se o produto não existe, oferece cadastrá-lo na hora.
+    /// </summary>
     public async Task BuscarAsync()
     {
         var texto = (Busca.Text ?? "").Trim();
-        var p = texto.Length > 0 ? svc.ObterProdutoPorCodigo(texto) : null;
+        var m = QuantidadeNaBusca.Match(texto);
+        if (m.Success) { Quantidade.Text = m.Groups[1].Value; texto = m.Groups[2].Value.Trim(); Busca.Text = texto; }
+        var exato = texto.Length > 0 ? svc.ObterProdutoPorCodigo(texto) : null;
+        var p = exato;
+        var recemCadastrado = false;
         if (p == null)
         {
             var achados = texto.Length > 0 ? svc.ListarProdutos(texto) : new List<Produto>();
             if (achados.Count == 1) p = achados[0];
             else if (texto.Length > 0 && achados.Count == 0)
             {
-                await Plat.Atual.Mensagem(Janela, "Busca", $"Nenhum produto encontrado para '{texto}'.", Nivel.Info);
-                return;
+                if (!await Plat.Atual.Confirmar(Janela, "Produto não encontrado", $"Não encontrei “{texto}”.\n\nQuer cadastrar esse produto agora?")) return;
+                p = await Fluxos.NovoProdutoAsync(Janela, svc, texto);
+                recemCadastrado = p != null;
             }
             else p = await SelecionarProdutoDialog.Abrir(Janela, svc, texto);
         }
-        if (p != null) Selecionar(p);
+        if (p == null) return;
+        Selecionar(p);
+        if (venda && (exato != null || recemCadastrado) && p.Estoque > 0) await AdicionarAsync();
     }
 
     public void Selecionar(Produto p)

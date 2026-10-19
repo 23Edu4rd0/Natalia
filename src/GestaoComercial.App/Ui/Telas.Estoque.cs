@@ -35,9 +35,9 @@ public sealed class EstoqueTela : Tela
                             new Col("Mínimo", 90, true), new Col("Custo unit.", 110, true), new Col("Venda unit.", 110, true), new Col("Valor (custo)", 140, true));
         var resumoCartao = K.Cartao(resumo); resumoCartao.Margin = new Thickness(0, 0, 0, 14);
         var nota = K.Discreto("Linhas em vermelho: estoque no mínimo ou abaixo dele."); nota.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(new StackPanel { Children = { resumoCartao, barra } }, Tabela, nota);
+        Content = K.Doca(new StackPanel { Children = { resumoCartao, barra } }, Tabela.ComVazio("Nenhum produto para mostrar.\nCadastre produtos na página Produtos."), nota);
 
-        K.AoMudarTexto(Busca, Seguro(Atualizar));
+        K.AoMudarTexto(Busca, K.Debounce(Seguro(Atualizar)));
         SomenteBaixo.IsCheckedChanged += (_, _) => Seguro(Atualizar)();
         Tabela.Duplo += SeguroAsync(AjustarAsync);
     }
@@ -99,12 +99,12 @@ public sealed class EstoqueTela : Tela
     public async Task ExportarAsync()
     {
         var produtos = Produtos();
-        if (produtos.Count == 0) { await Info("Não há produtos para exportar.", "Exportar"); return; }
+        if (produtos.Count == 0) { Dica("Não há produtos para exportar."); return; }
         var caminho = await Plat.Atual.SalvarArquivo(Janela, "Exportar estoque", Config.Subpasta("exportacoes"), "estoque.csv", "CSV (Excel)", "csv");
         if (caminho == null) return;
         var n = Util.ExportarCsv(caminho, new[] { "Tipo", "Código", "Produto", "Un.", "Estoque", "Mínimo", "Custo unit.", "Venda unit.", "Valor em estoque (custo)" },
             produtos.Select(p => new object?[] { p.Categoria, p.Codigo, p.Nome, p.Unidade, p.Estoque, p.EstoqueMin, Util.FmtDinheiro(p.PrecoCusto, false),
                                                  Util.FmtDinheiro(p.PrecoVenda, false), Util.FmtDinheiro(p.Estoque * p.PrecoCusto, false) }));
-        await Info($"{n} produto(s) exportado(s) para:\n{caminho}", "Exportado");
+        Sucesso($"{n} produto(s) exportado(s).", ("Abrir arquivo", () => Plat.Atual.Abrir(caminho)));
     }
 }

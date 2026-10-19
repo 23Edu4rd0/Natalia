@@ -17,8 +17,13 @@ public partial class Servico
         { "Dinheiro", "Pix", "Cartão de débito", "Cartão de crédito", "Fiado", "Transferência", "Outro" };
 
     readonly SqliteConnection conn;
+    long versao;
 
     public Servico(SqliteConnection conexao) { conn = conexao; }
+
+    /// <summary>Aumenta a cada gravação. As telas usam para só recarregar quando algo realmente mudou.</summary>
+    public long Versao => Interlocked.Read(ref versao);
+    void Mudou() => Interlocked.Increment(ref versao);
 
     // ------------------------------------------------------------------ infraestrutura SQL
     SqliteCommand Cmd(string sql, object?[] args)
@@ -87,6 +92,7 @@ public partial class Servico
         {
             var r = corpo();
             Exec("COMMIT");
+            Mudou();
             return r;
         }
         catch
@@ -153,6 +159,13 @@ public partial class Servico
                 Exec("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", k, v);
         });
     }
+
+    // ------------------------------------------------------------------ configurações simples
+    public string ObterConfig(string chave, string padrao = "") =>
+        Um("SELECT valor FROM config WHERE chave = ?", r => r.S("valor"), chave) ?? padrao;
+
+    public void SalvarConfig(string chave, string valor) =>
+        Tx(() => Exec("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", chave, valor));
 
     // ------------------------------------------------------------------ categorias (tipos de produto)
     public List<Categoria> ListarCategorias()
@@ -262,12 +275,34 @@ public partial class Servico
     }
 
     /// <summary>Um backup por dia, mantendo os mais recentes. Retorna o arquivo criado (null se já existia).</summary>
-    public string? BackupAutomatico(string pasta, int manter = 14)
+    public string? BackupAutomatico(string pasta, int manter = 14) => BackupDiario(pasta, manter, FazerBackup);
+
+    /// <summary>
+    /// Igual ao backup diário, mas lê o banco por uma conexão própria: pode rodar em segundo plano sem
+    /// atrasar a abertura do programa (importante quando o banco é grande).
+    /// </summary>
+    public static string? BackupAutomaticoDeArquivo(string caminhoBanco, string pasta, int manter = 14) =>
+        BackupDiario(pasta, manter, destino =>
+        {
+            var tmp = destino + ".tmp";
+            if (File.Exists(tmp)) File.Delete(tmp);
+            var cs = new SqliteConnectionStringBuilder { DataSource = caminhoBanco, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString();
+            using (var origem = new SqliteConnection(cs))
+            using (var saida = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = tmp, Pooling = false }.ToString()))
+            {
+                origem.Open(); saida.Open();
+                origem.BackupDatabase(saida);
+            }
+            File.Move(tmp, destino, true);
+            return destino;
+        });
+
+    static string? BackupDiario(string pasta, int manter, Func<string, string> gravar)
     {
         Directory.CreateDirectory(pasta);
         var alvo = Path.Combine(pasta, $"gestao-{DateTime.Today:yyyy-MM-dd}.db");
         string? criado = null;
-        if (!File.Exists(alvo)) criado = FazerBackup(alvo);
+        if (!File.Exists(alvo)) criado = gravar(alvo);
         var antigos = Directory.GetFiles(pasta, "gestao-????-??-??.db").OrderBy(x => x, StringComparer.Ordinal).ToList();
         foreach (var velho in antigos.Take(Math.Max(0, antigos.Count - manter)))
         {

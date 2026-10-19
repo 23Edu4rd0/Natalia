@@ -21,6 +21,8 @@ public abstract class CadastroTela<T> : Tela where T : class
     protected abstract ResultadoExclusao Remover(long id);
     protected abstract string[] CabecalhoCsv { get; }
     protected abstract object?[] LinhaCsv(T item);
+    protected virtual Action<FormDialog, string>? AoMudarCampo => null;
+    protected virtual string MensagemVazia => $"Nenhum {Singular} cadastrado ainda.\nClique em “Novo {Singular}” para começar.";
     protected virtual void MontarFiltros(StackPanel barra) { }
     protected virtual void MontarAcoes(StackPanel barra) { }
 
@@ -50,9 +52,9 @@ public abstract class CadastroTela<T> : Tela where T : class
 
         Tabela = new Tabela(Colunas);
         total.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(acoes, Tabela, total);
+        Content = K.Doca(acoes, Tabela.ComVazio(MensagemVazia), total);
 
-        K.AoMudarTexto(Busca, Seguro(Atualizar));
+        K.AoMudarTexto(Busca, K.Debounce(Seguro(Atualizar)));
         Inativos.IsCheckedChanged += (_, _) => Seguro(Atualizar)();
         Tabela.Duplo += SeguroAsync(EditarAsync);
     }
@@ -60,20 +62,21 @@ public abstract class CadastroTela<T> : Tela where T : class
     public override void Atualizar()
     {
         var dados = Listar();
+        Tabela.TextoVazio = (Busca.Text ?? "").Trim().Length > 0 ? $"Nada encontrado para “{Busca.Text!.Trim()}”." : MensagemVazia;
         Tabela.Definir(dados.Select(ParaLinha));
         total.Text = $"{dados.Count} {(dados.Count == 1 ? Singular : Plural)}";
     }
 
     public async Task NovoAsync()
     {
-        if (await FormDialog.Abrir(Janela, $"Novo {Singular}", Campos(true), Iniciais(null), v => Salvar(v, null))) Atualizar();
+        if (await FormDialog.Abrir(Janela, $"Novo {Singular}", Campos(true), Iniciais(null), v => Salvar(v, null), "Salvar", AoMudarCampo)) Atualizar();
     }
 
     public async Task EditarAsync()
     {
         var id = Exigir(Tabela.IdLong, $"um {Singular}");
         var item = Obter(id);
-        if (await FormDialog.Abrir(Janela, $"Editar {Singular}", Campos(false), Iniciais(item), v => Salvar(v, id))) Atualizar();
+        if (await FormDialog.Abrir(Janela, $"Editar {Singular}", Campos(false), Iniciais(item), v => Salvar(v, id), "Salvar", AoMudarCampo)) Atualizar();
     }
 
     public async Task ExcluirAsync()
@@ -91,11 +94,11 @@ public abstract class CadastroTela<T> : Tela where T : class
     public async Task ExportarAsync()
     {
         var dados = Listar();
-        if (dados.Count == 0) { await Info("Não há dados para exportar.", "Exportar"); return; }
+        if (dados.Count == 0) { Dica("Não há dados para exportar."); return; }
         var caminho = await Plat.Atual.SalvarArquivo(Janela, "Exportar CSV", Config.Subpasta("exportacoes"), $"{Plural}.csv", "CSV (Excel)", "csv");
         if (caminho == null) return;
         var n = Util.ExportarCsv(caminho, CabecalhoCsv, dados.Select(LinhaCsv));
-        await Info($"{n} linha(s) exportada(s) para:\n{caminho}", "Exportado");
+        Sucesso($"{n} linha(s) exportada(s).", ("Abrir arquivo", () => Plat.Atual.Abrir(caminho)));
     }
 }
 
@@ -173,6 +176,7 @@ public sealed class ProdutosTela : CadastroTela<Produto>
 
     public ProdutosTela(MainWindow app) : base(app) { }
     protected override string Descricao => "O que você vende: preços, tipos e estoque mínimo. Linhas em vermelho precisam de reposição.";
+    protected override string MensagemVazia => "Nenhum produto cadastrado ainda.\nClique em “Novo produto” ou use “Importar planilha” para trazer sua lista do Excel.";
 
     protected override string Singular => "produto";
     protected override string Plural => "produtos";
@@ -191,9 +195,12 @@ public sealed class ProdutosTela : CadastroTela<Produto>
 
     protected override void MontarAcoes(StackPanel barra)
     {
-        barra.Children.Insert(0, K.Botao("Tipos…", SeguroAsync(GerenciarTiposAsync), icone: "produtos"));
-        barra.Children.Insert(1, K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "relatorios"));
+        barra.Children.Insert(0, K.Botao("Importar planilha…", SeguroAsync(ImportarAsync), icone: "exportar"));
+        barra.Children.Insert(1, K.Botao("Tipos…", SeguroAsync(GerenciarTiposAsync), icone: "produtos"));
+        barra.Children.Insert(2, K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "relatorios"));
     }
+
+    public Task ImportarAsync() => ImportarProdutosDialog.Abrir(Janela, Svc, AtualizarTudo);
 
     /// <summary>Aumenta ou reduz os preços de todos os produtos (ou de um tipo) em uma porcentagem.</summary>
     public async Task ReajustarAsync()
@@ -217,11 +224,11 @@ public sealed class ProdutosTela : CadastroTela<Produto>
         }, "Continuar");
         if (!ok) return;
         var n = Svc.ListarProdutos(categoriaId: tipo).Count;
-        if (n == 0) { await Info("Não há produtos nesse grupo."); return; }
+        if (n == 0) { Dica("Não há produtos nesse grupo."); return; }
         if (!await Confirmar($"Reajustar {n} produto(s) em {(pct > 0 ? "+" : "")}{pct:0.##}%?\n\nOs preços de venda{(custo ? " e de custo" : "")} serão alterados agora.")) return;
         Svc.ReajustarPrecos(tipo, pct, custo);
         Atualizar();
-        await Info($"{n} produto(s) reajustado(s) em {(pct > 0 ? "+" : "")}{pct:0.##}%.");
+        Sucesso($"{n} produto(s) reajustado(s) em {(pct > 0 ? "+" : "")}{pct:0.##}%.");
     }
 
     public async Task GerenciarTiposAsync() => await CategoriasDialog.Abrir(Janela, Svc, () => Seguro(Atualizar)());
@@ -252,40 +259,10 @@ public sealed class ProdutosTela : CadastroTela<Produto>
     protected override Produto Obter(long id) => Svc.ObterProduto(id);
     protected override string NomeDe(Produto p) => p.Nome;
 
-    protected override List<Campo> Campos(bool novo)
-    {
-        var cats = new List<(long? Valor, string Rotulo)> { (null, "(sem tipo)") };
-        cats.AddRange(Svc.ListarCategorias().Select(c => ((long?)c.Id, c.Nome)));
-        var c = new List<Campo>
-        {
-            new() { Chave = "nome", Rotulo = "Nome do produto", Obrigatorio = true },
-            new() { Chave = "codigo", Rotulo = "Código / cód. barras", Dica = "Deixe em branco para gerar automaticamente." },
-            new() { Chave = "categoria", Rotulo = "Tipo de produto", Tipo = TipoCampo.Escolha, Opcoes = cats },
-            new() { Chave = "unidade", Rotulo = "Unidade", Dica = "un, kg, cx, pct, l..." },
-            new() { Chave = "custo", Rotulo = "Preço de custo (R$)", Tipo = TipoCampo.Dinheiro },
-            new() { Chave = "venda", Rotulo = "Preço de venda (R$)", Tipo = TipoCampo.Dinheiro, Obrigatorio = true },
-            new() { Chave = "minimo", Rotulo = "Estoque mínimo", Tipo = TipoCampo.Inteiro, Dica = "Avisa quando o estoque chegar a este valor." },
-        };
-        if (novo) c.Add(new Campo { Chave = "inicial", Rotulo = "Estoque inicial", Tipo = TipoCampo.Inteiro });
-        else
-        {
-            c.Add(new Campo { Chave = "estoque", Rotulo = "Estoque atual", Tipo = TipoCampo.Inteiro, SomenteLeitura = true, Dica = "Para corrigir o estoque use 'Ajustar estoque' na aba Estoque." });
-            c.Add(new Campo { Chave = "ativo", Rotulo = "Ativo", Tipo = TipoCampo.Bool });
-        }
-        return c;
-    }
-
-    protected override Dictionary<string, object?> Iniciais(Produto? p) => p == null
-        ? new() { ["unidade"] = "un", ["minimo"] = 0L, ["inicial"] = 0L }
-        : new()
-        {
-            ["nome"] = p.Nome, ["codigo"] = p.Codigo, ["categoria"] = p.CategoriaId, ["unidade"] = p.Unidade, ["custo"] = p.PrecoCusto,
-            ["venda"] = p.PrecoVenda, ["minimo"] = p.EstoqueMin, ["estoque"] = p.Estoque, ["ativo"] = p.Ativo,
-        };
-
-    protected override void Salvar(Valores v, long? id) =>
-        Svc.SalvarProduto(new ProdutoDados(v.Texto("nome"), v.Texto("codigo"), v.Escolha("categoria"), v.Texto("unidade"), v.Num("custo"), v.Num("venda"),
-                                           v.Num("minimo"), v.Num("inicial"), id == null || v.Bool("ativo")), id);
+    protected override List<Campo> Campos(bool novo) => FormProduto.Campos(Svc, novo);
+    protected override Dictionary<string, object?> Iniciais(Produto? p) => FormProduto.Iniciais(p);
+    protected override Action<FormDialog, string>? AoMudarCampo => FormProduto.AoMudar;
+    protected override void Salvar(Valores v, long? id) => FormProduto.Salvar(Svc, v, id);
 
     protected override ResultadoExclusao Remover(long id) => Svc.ExcluirProduto(id);
 

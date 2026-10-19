@@ -29,6 +29,14 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 ## O que ele faz
 
+**Novidades da 2.2 (menos cliques, mais rápido)**
+- **Venda em poucos cliques**: sem janela de confirmação; ao finalizar aparece um aviso com **Desfazer**, **Imprimir nota**, **Cupom 80 mm** e **WhatsApp**. O que acontece após a venda é configurável (Configurações).
+- **Digitou o código, já entrou**: leitor de código de barras adiciona na hora; `3x blusa` vende 3 de uma vez; produto não cadastrado pode ser cadastrado ali mesmo.
+- **Cliente por digitação** (com aviso se já deve no fiado), atalhos de **5% / 10%** e **valor recebido** (valor exato, R$ 20/50/100).
+- **Importar produtos do Excel/CSV** (com planilha modelo; atualiza por código e aponta a linha de cada erro), **restaurar backup** pelo programa e **margem de lucro ↔ preço** calculada enquanto digita.
+- **Primeiros passos** na tela inicial para quem acabou de instalar, mensagens nas listas vazias e erros no próprio formulário.
+- **Mais rápido**: telas carregadas só quando abertas e atualizadas só quando os dados mudam, busca com atraso inteligente (sem travar ao digitar), banco em modo WAL e backup diário em segundo plano.
+
 **Vender**
 - **Nova venda**: busque por código, código de barras (leitor funciona) ou nome, ou clique nos botões dos **produtos mais vendidos**. Desconto em **R$ ou %** (ex.: `10%`), forma de pagamento, **troco** automático para pagamentos em dinheiro e **cadastro rápido de cliente** na hora. Atalhos: **F2** nova venda, **F9** finalizar.
 - **Fiado**: escolha o cliente e a forma "Fiado". Em **A receber** você vê quem deve, registra pagamentos (total ou parcial), consulta o **extrato**, **cobra por WhatsApp** com mensagem pronta e imprime o extrato.
@@ -60,5 +68,5 @@ Dentro: `gestao.db`, `backups/`, `notas/`, `exportacoes/` e `logs/gestao.log`.
 ```
 src/GestaoComercial.Core   regras de negócio e SQLite (sem interface)
 src/GestaoComercial.App    telas (Avalonia)
-tests/GestaoComercial.Tests  125 testes: regras + interface renderizada em memória   →   dotnet test
+tests/GestaoComercial.Tests  156 testes: regras + interface renderizada em memória   →   dotnet test
 ```

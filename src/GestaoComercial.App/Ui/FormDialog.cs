@@ -39,9 +39,9 @@ public sealed class FormDialog : JanelaBase
     bool salvo;
 
     public static async Task<bool> Abrir(Window? dono, string titulo, List<Campo> campos, Dictionary<string, object?>? iniciais,
-                                         Action<Valores> aoSalvar, string textoBotao = "Salvar")
+                                         Action<Valores> aoSalvar, string textoBotao = "Salvar", Action<FormDialog, string>? aoMudarCampo = null)
     {
-        var f = new FormDialog(titulo, campos, iniciais ?? new(), aoSalvar, textoBotao);
+        var f = new FormDialog(titulo, campos, iniciais ?? new(), aoSalvar, textoBotao) { aoMudarCampo = aoMudarCampo };
         if (dono != null) await f.ShowDialog(dono); else { f.Show(); await Task.Delay(Timeout.Infinite); }
         return f.salvo;
     }
@@ -51,6 +51,15 @@ public sealed class FormDialog : JanelaBase
         => new(titulo, campos, iniciais ?? new(), aoSalvar, textoBotao);
 
     public bool Salvo => salvo;
+    Action<FormDialog, string>? aoMudarCampo;
+    readonly TextBlock lblErro = new() { Foreground = Cores.P(Cores.Vermelho), TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13, IsVisible = false, Margin = new Thickness(0, 10, 0, 0) };
+    /// <summary>Último erro de preenchimento mostrado dentro da janela (vazio se não há).</summary>
+    public string Erro => lblErro.IsVisible ? lblErro.Text ?? "" : "";
+
+    /// <summary>Texto atual de um campo digitável.</summary>
+    public string Texto(string chave) => controles[chave] is TextBox t ? t.Text ?? "" : "";
+
+    void MostrarErro(string texto) { lblErro.Text = texto; lblErro.IsVisible = true; }
 
     FormDialog(string titulo, List<Campo> campos, Dictionary<string, object?> iniciais, Action<Valores> aoSalvar, string textoBotao)
     {
@@ -116,7 +125,17 @@ public sealed class FormDialog : JanelaBase
         var barra = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         barra.Children.Add(salvar); barra.Children.Add(cancelar);
         grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        K.ColocarNaGrade(grade, lblErro, linha, 0, 2);
+        linha++;
+        grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         K.ColocarNaGrade(grade, barra, linha, 0, 2);
+        // ao digitar: some o erro anterior e avisa quem quiser reagir (ex.: calcular preço pela margem)
+        foreach (var (chave, ctl) in controles)
+            if (ctl is TextBox tb)
+            {
+                var k = chave;
+                tb.PropertyChanged += (_, e) => { if (e.Property == TextBox.TextProperty) { lblErro.IsVisible = false; aoMudarCampo?.Invoke(this, k); } };
+            }
         Content = grade;
 
         KeyDown += (_, e) =>
@@ -172,6 +191,11 @@ public sealed class FormDialog : JanelaBase
         try
         {
             aoSalvar(Coletar());
+        }
+        catch (AppException ex)
+        {
+            MostrarErro(ex.Message);   // erro de preenchimento: aparece aqui mesmo, sem abrir outra caixa
+            return false;
         }
         catch (Exception ex)
         {

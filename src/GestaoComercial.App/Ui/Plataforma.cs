@@ -20,7 +20,10 @@ public interface IPlataforma
     Task<bool> Confirmar(Window? dono, string titulo, string texto);
     Task<string?> Perguntar(Window? dono, string titulo, string texto, string inicial = "");
     Task<string?> SalvarArquivo(Window? dono, string titulo, string pastaInicial, string nomeInicial, string descricao, string extensao);
+    Task<string?> AbrirArquivo(Window? dono, string titulo, string descricao, string[] extensoes);
     bool Abrir(string caminho);
+    /// <summary>Aviso rápido que não bloqueia o trabalho: some sozinho e pode ter botões de ação (ex.: Imprimir, Desfazer).</summary>
+    void Toast(Window? dono, string texto, Nivel nivel = Nivel.Info, IReadOnlyList<(string Rotulo, Action Acao)>? acoes = null, int segundos = 5);
 }
 
 public static class Plat
@@ -50,6 +53,25 @@ sealed class PlataformaReal : IPlataforma
         var caminho = arq?.TryGetLocalPath();
         if (caminho != null && !Path.HasExtension(caminho)) caminho += "." + extensao;
         return caminho;
+    }
+
+    public async Task<string?> AbrirArquivo(Window? dono, string titulo, string descricao, string[] extensoes)
+    {
+        if (dono == null) return null;
+        var arqs = await dono.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = titulo, AllowMultiple = false,
+            FileTypeFilter = new[] { new FilePickerFileType(descricao) { Patterns = extensoes.Select(e => "*." + e).ToArray() } },
+        });
+        return arqs.Count > 0 ? arqs[0].TryGetLocalPath() : null;
+    }
+
+    public void Toast(Window? dono, string texto, Nivel nivel = Nivel.Info, IReadOnlyList<(string Rotulo, Action Acao)>? acoes = null, int segundos = 5)
+    {
+        var j = dono;
+        while (j != null && j is not MainWindow) j = j.Owner as Window;
+        if (j is MainWindow principal) principal.MostrarToast(texto, nivel, acoes, segundos);
+        else _ = Mensagem(dono, nivel == Nivel.Erro ? "Erro" : "Aviso", texto, nivel);   // sem janela principal: cai para a caixa de mensagem
     }
 
     /// <summary>Abre arquivo, pasta ou página com o programa padrão do sistema.</summary>

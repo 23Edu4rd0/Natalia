@@ -37,6 +37,8 @@ public partial class Servico
         return Util.OrdenarPorNome(Todos(sql, MapProduto, p.ToArray()), x => x.Nome);
     }
 
+    public bool TemProdutos() => Escalar("SELECT COUNT(*) FROM produtos") > 0;
+
     public Produto ObterProduto(long id) =>
         Um(ProdutoSelect + " WHERE p.id = ?", MapProduto, id) ?? throw new NaoEncontradoException("Produto não encontrado.");
 
@@ -54,7 +56,10 @@ public partial class Servico
         return p;
     }
 
-    public long SalvarProduto(ProdutoDados d, long? id = null)
+    public long SalvarProduto(ProdutoDados d, long? id = null) => Tx(() => GravarProduto(d, id));
+
+    /// <summary>Valida e grava o produto; deve rodar dentro de uma transação (ver <see cref="SalvarProduto"/>).</summary>
+    long GravarProduto(ProdutoDados d, long? id)
     {
         var nome = Texto(d.Nome, "o nome do produto", true, 120);
         var codigo = Texto(d.Codigo, "o código", false, 40);
@@ -74,7 +79,6 @@ public partial class Servico
             if (dup != null) throw new ConflitoException($"Já existe um produto com o código '{codigo}': {dup}.");
         }
 
-        return Tx(() =>
         {
             if (id is null)
             {
@@ -89,7 +93,7 @@ public partial class Servico
             Exec("UPDATE produtos SET codigo=?, nome=?, categoria_id=?, unidade=?, preco_custo=?, preco_venda=?, estoque_min=?, ativo=? WHERE id=?",
                  codigo, nome, categoriaId, unidade, custo, venda, minimo, d.Ativo ? 1 : 0, id);
             return id.Value;
-        });
+        }
     }
 
     /// <summary>Exclui; se já houver movimentação, apenas inativa.</summary>

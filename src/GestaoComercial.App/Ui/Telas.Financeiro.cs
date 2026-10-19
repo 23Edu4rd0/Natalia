@@ -137,7 +137,7 @@ public sealed class ReceberTela : Tela
         barra.Margin = new Thickness(0, 0, 0, 14);
         var dica = K.Discreto("Para vender no fiado: em \"Nova venda\" escolha o cliente e a forma de pagamento \"Fiado\".");
         dica.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(new StackPanel { Children = { cartoes, barra } }, Tabela, dica);
+        Content = K.Doca(new StackPanel { Children = { cartoes, barra } }, Tabela.ComVazio("Ninguém está devendo. Tudo em dia!\nPara vender no fiado, escolha o cliente e a forma “Fiado” na venda."), dica);
         Tabela.Duplo += SeguroAsync(ExtratoAsync);
     }
 
@@ -166,7 +166,7 @@ public sealed class ReceberTela : Tela
     {
         var id = Exigir(Tabela.IdLong, "um cliente");
         var d = devedores.First(x => x.ClienteId == id);
-        if (d.Saldo <= 0) { await Info($"{d.Nome} não tem nada a pagar."); return; }
+        if (d.Saldo <= 0) { Dica($"{d.Nome} não tem nada a pagar."); return; }
         await Fluxos.WhatsAppAsync(Janela, d.Telefone, Impressos.MensagemCobranca(Svc.ObterEmpresa(), d.Nome, d.Saldo));
     }
 

@@ -43,8 +43,13 @@ public partial class App : Application
             conexao = Banco.Conectar(Config.CaminhoBanco());
             Banco.Migrar(conexao);
             var svc = new Servico(conexao);
-            try { svc.BackupAutomatico(Config.Subpasta("backups")); }
-            catch (Exception ex) { Log.Erro("Backup automático falhou", ex); } // falha de backup não impede o uso
+            // backup diário em segundo plano, por uma conexão própria: não atrasa a abertura (banco grande) e não trava o uso
+            var caminhoBanco = Config.CaminhoBanco(); var pastaBackups = Config.Subpasta("backups");
+            _ = Task.Run(() =>
+            {
+                try { Servico.BackupAutomaticoDeArquivo(caminhoBanco, pastaBackups); }
+                catch (Exception ex) { Log.Erro("Backup automático falhou", ex); } // falha de backup não impede o uso
+            });
             return new MainWindow(svc);
         }
         catch (Exception ex)

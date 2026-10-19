@@ -32,6 +32,15 @@ public sealed class PlataformaFalsa : IPlataforma
     public List<string> Confirmacoes { get; } = new();
 
     public (Nivel Nivel, string Titulo, string Texto) Ultima => Msgs[^1];
+    public List<(string Texto, Nivel Nivel, IReadOnlyList<(string Rotulo, Action Acao)> Acoes)> Toasts { get; } = new();
+    public (string Texto, Nivel Nivel, IReadOnlyList<(string Rotulo, Action Acao)> Acoes) UltimoToast => Toasts[^1];
+    public string? ArquivoParaAbrir { get; set; }
+    /// <summary>Aperta o botão de ação de um aviso rápido (como o usuário clicando nele).</summary>
+    public void ClicarToast(string rotulo) => UltimoToast.Acoes.First(a => a.Rotulo == rotulo).Acao();
+
+    public void Toast(Window? dono, string texto, Nivel nivel = Nivel.Info, IReadOnlyList<(string Rotulo, Action Acao)>? acoes = null, int segundos = 5)
+        => Toasts.Add((texto, nivel, acoes ?? Array.Empty<(string, Action)>()));
+    public Task<string?> AbrirArquivo(Window? dono, string titulo, string descricao, string[] extensoes) => Task.FromResult(ArquivoParaAbrir);
 
     public Task Mensagem(Window? dono, string titulo, string texto, Nivel nivel) { Msgs.Add((nivel, titulo, texto)); return Task.CompletedTask; }
     public Task<bool> Confirmar(Window? dono, string titulo, string texto) { Confirmacoes.Add(texto); return Task.FromResult(RespostaConfirmar); }
@@ -58,6 +67,7 @@ public sealed class Ambiente : IDisposable
         Banco.Migrar(Conn);
         S = new Servico(Conn);
         Plat.Atual = P;
+        K.DebounceMs = 0;                                   // busca imediata nos testes
         Janela = new MainWindow(S) { Width = 1240, Height = 760 };
     }
 

@@ -21,12 +21,29 @@ public static class Banco
             }.ToString();
             var conn = new SqliteConnection(cs);
             conn.Open();
+            Otimizar(conn);
             return conn;
         }
         catch (SqliteException ex)
         {
             throw new AppException($"Não foi possível abrir o banco de dados em:\n{caminho}\n\n{ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// WAL: leituras não bloqueiam gravações (backup em segundo plano sem travar) e cada gravação faz menos
+    /// sincronizações com o disco (vendas e entradas ficam bem mais rápidas, principalmente no Windows).
+    /// Se o local não permitir (ex.: pasta de rede), segue no modo padrão.
+    /// </summary>
+    static void Otimizar(SqliteConnection conn)
+    {
+        try
+        {
+            using var c = conn.CreateCommand();
+            c.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;";
+            c.ExecuteNonQuery();
+        }
+        catch (SqliteException) { /* mantém o modo padrão */ }
     }
 
     public static void Migrar(SqliteConnection conn)

@@ -15,6 +15,8 @@ public sealed class PainelTela : Tela
     readonly K.Indicador receber = new("A receber", "receber", "#B45309", "#FEF3C7");
     readonly K.Indicador baixo = new("Estoque baixo", "alerta", "#DC2626", "#FEE2E2");
     readonly Tabela tBaixo, tVendas;
+    readonly Control primeirosPassos;
+    public bool PrimeirosPassosVisivel => primeirosPassos.IsVisible;
     public IReadOnlyList<K.Indicador> Cartoes => new[] { hoje, mes, lucro, receber, baixo };
 
     public override string Titulo => $"{Saudacao()}!";
@@ -43,11 +45,41 @@ public sealed class PainelTela : Tela
         K.ColocarNaGrade(g, K.Margem(K.H2("Últimas vendas"), 14, 0, 0, 0), 0, 1);
         tBaixo.Margin = new Thickness(0, 10, 14, 0); tVendas.Margin = new Thickness(14, 10, 0, 0);
         K.ColocarNaGrade(g, tBaixo, 1, 0); K.ColocarNaGrade(g, tVendas, 1, 1);
-        Content = K.Doca(new StackPanel { Children = { cartoes, atalhos } }, g);
+        primeirosPassos = MontarPrimeirosPassos();
+        Content = K.Doca(new StackPanel { Children = { primeirosPassos, cartoes, atalhos } }, g);
+    }
+
+    Control MontarPrimeirosPassos()
+    {
+        Control Passo(string n, string texto, params Control[] botoes)
+        {
+            var num = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Cores.P(Cores.Primaria), VerticalAlignment = VerticalAlignment.Center,
+                                   Child = new TextBlock { Text = n, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = Avalonia.Media.Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+            var linha = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Margin = new Thickness(0, 4) };
+            K.ColocarNaGrade(linha, num, 0, 0);
+            var t = K.Rotulo(texto, false, 14); t.Margin = new Thickness(12, 0); K.ColocarNaGrade(linha, t, 0, 1);
+            K.ColocarNaGrade(linha, K.Linha(8, botoes), 0, 2);
+            return linha;
+        }
+        var corpo = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                K.H2("Bem-vinda! Vamos começar em 3 passos"),
+                K.Discreto("Leva poucos minutos e depois é só vender."),
+                Passo("1", "Coloque o nome e os dados da sua loja (aparecem nas notas).", K.Botao("Dados da loja", () => App.IrPara("Configurações"))),
+                Passo("2", "Cadastre seus produtos — ou traga a lista do Excel de uma vez.", K.Botao("Cadastrar produtos", () => App.IrPara("Produtos")), K.Botao("Importar planilha", () => _ = ((ProdutosTela)App.Telas["Produtos"]).ImportarAsync())),
+                Passo("3", "Faça sua primeira venda.", K.Botao("Nova venda", () => App.IrPara("Nova venda"), classe: "primario")),
+            },
+        };
+        var cartao = K.Cartao(corpo); cartao.Margin = new Thickness(0, 0, 0, 16); cartao.IsVisible = false;
+        return cartao;
     }
 
     public override void Atualizar()
     {
+        primeirosPassos.IsVisible = !Svc.TemProdutos();
         var d = Svc.ObterPainel();
         hoje.Definir(Util.FmtDinheiro(d.Hoje.Total), $"{d.Hoje.Qtd} venda(s)");
         mes.Definir(Util.FmtDinheiro(d.Mes.Total), $"{d.Mes.Qtd} venda(s)");

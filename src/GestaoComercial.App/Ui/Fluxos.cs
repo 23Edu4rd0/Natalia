@@ -42,6 +42,21 @@ public static class Fluxos
         return ok ? criado : null;
     }
 
+    /// <summary>
+    /// Cadastro de produto a partir do que foi digitado na busca (nome ou código de barras): evita ter que sair da venda/entrada.
+    /// Retorna o produto criado, ou null se cancelou.
+    /// </summary>
+    public static async Task<Produto?> NovoProdutoAsync(Window? dono, Servico svc, string? busca = null)
+    {
+        var t = (busca ?? "").Trim();
+        var pareceCodigo = t.Length > 0 && !t.Contains(' ') && t.Any(char.IsDigit);
+        long? criado = null;
+        var ok = await FormDialog.Abrir(dono, "Novo produto", FormProduto.Campos(svc, true),
+            FormProduto.Iniciais(null, pareceCodigo ? t : null, pareceCodigo ? null : t),
+            v => criado = FormProduto.Salvar(svc, v, null), "Cadastrar", FormProduto.AoMudar);
+        return ok && criado != null ? svc.ObterProduto(criado.Value) : null;
+    }
+
     /// <summary>Abre o WhatsApp (app ou navegador) com a mensagem pronta.</summary>
     public static async Task WhatsAppAsync(Window? dono, string? telefone, string mensagem)
     {

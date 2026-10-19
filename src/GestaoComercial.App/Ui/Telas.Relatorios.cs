@@ -78,8 +78,24 @@ public sealed class ConfigTela : Tela
     public TextBox Telefone { get; } = K.Caixa("");
     public TextBox Rodape { get; } = K.Caixa("");
 
+    public ComboBox AposVenda { get; }
+    static readonly (string Valor, string Rotulo)[] OpcoesAposVenda =
+    {
+        ("aviso", "Mostrar um aviso com botões (Imprimir, Cupom, WhatsApp, Desfazer)"),
+        ("cupom", "Abrir o cupom 80 mm automaticamente"),
+        ("perguntar", "Perguntar se quero imprimir"),
+        ("nada", "Não fazer nada (só o aviso com Desfazer)"),
+    };
+    bool carregando;
+
     public ConfigTela(MainWindow app) : base(app)
     {
+        AposVenda = K.Combo(OpcoesAposVenda.Select(o => o.Rotulo), double.NaN, OpcoesAposVenda[0].Rotulo); AposVenda.HorizontalAlignment = HorizontalAlignment.Stretch;
+        AposVenda.SelectionChanged += (_, _) =>
+        {
+            if (carregando || AposVenda.SelectedIndex < 0) return;
+            Seguro(() => { Svc.SalvarConfig(VendaTela.ConfigAposVenda, OpcoesAposVenda[AposVenda.SelectedIndex].Valor); Sucesso("Preferência salva."); })();
+        };
         var g = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto,Auto") };
         var campos = new (string, TextBox)[] { ("Nome / Razão social *", Nome), ("CNPJ / CPF", Documento), ("Endereço", Endereco), ("Telefone", Telefone), ("Mensagem no rodapé da nota", Rodape) };
         for (int i = 0; i < campos.Length; i++)
@@ -97,15 +113,18 @@ public sealed class ConfigTela : Tela
         bk.Children.Add(K.Linha(K.Botao("Fazer backup agora…", SeguroAsync(BackupAsync)), K.Botao("Abrir pasta de backups", Seguro(() => AbrirPasta("backups"))),
                                 K.Botao("Abrir pasta de dados", Seguro(() => AbrirPasta(null))),
                                 K.Botao("Abrir pasta de notas", Seguro(() => AbrirPasta("notas"))), K.Botao("Sobre o programa", Seguro(App.Sobre))));
+        bk.Children.Insert(2, K.Botao("Restaurar um backup…", SeguroAsync(RestaurarAsync), icone: "pasta", classe: "perigo"));
         bk.Children.Add(K.Discreto($"Pasta de dados: {Config.PastaDados()}"));
         var backup = Grupo("Backup e dados", bk);
+
+        var venda = Grupo("Ao finalizar uma venda", AposVenda);
 
         var imp = Grupo("Importante", new TextBlock
         {
             Text = "As notas emitidas por este programa são comprovantes internos de venda e NÃO têm valor fiscal.\nPara emitir NF-e / NFC-e / cupom fiscal é necessário um emissor autorizado pela SEFAZ.",
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
         });
-        Content = new ScrollViewer { Content = new StackPanel { Spacing = 14, MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left, Children = { empresa, backup, imp } } };
+        Content = new ScrollViewer { Content = new StackPanel { Spacing = 14, MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left, Children = { empresa, venda, backup, imp } } };
     }
 
     static Control Grupo(string titulo, Control conteudo) =>
@@ -113,6 +132,10 @@ public sealed class ConfigTela : Tela
 
     public override void Atualizar()
     {
+        carregando = true;
+        var idx = Array.FindIndex(OpcoesAposVenda, o => o.Valor == Svc.ObterConfig(VendaTela.ConfigAposVenda, "aviso"));
+        AposVenda.SelectedIndex = idx < 0 ? 0 : idx;
+        carregando = false;
         var e = Svc.ObterEmpresa();
         Nome.Text = e.Nome; Documento.Text = Util.FmtDocumento(e.Documento); Endereco.Text = e.Endereco; Telefone.Text = e.Telefone; Rodape.Text = e.Rodape;
     }
@@ -121,7 +144,19 @@ public sealed class ConfigTela : Tela
     {
         Svc.SalvarEmpresa(new Empresa(Nome.Text ?? "", Documento.Text ?? "", Endereco.Text ?? "", Telefone.Text ?? "", Rodape.Text ?? ""));
         Atualizar();
-        await Info("Dados da empresa salvos. As próximas notas já sairão com eles.");
+        Sucesso("Dados da loja salvos. As próximas notas já saem com eles.");
+    }
+
+    /// <summary>Volta os dados para um backup antigo. Antes, guarda uma cópia de segurança do que existe agora.</summary>
+    public async Task RestaurarAsync()
+    {
+        var arquivo = await Plat.Atual.AbrirArquivo(Janela, "Escolha o arquivo de backup", "Backup (.db)", new[] { "db" });
+        if (arquivo == null) return;
+        if (!await Confirmar("Restaurar este backup?\n\nOs dados de hoje serão SUBSTITUÍDOS pelos do arquivo escolhido. " +
+                             "Uma cópia de segurança dos dados atuais é guardada antes, então dá para voltar atrás.", "Restaurar backup")) return;
+        var seguranca = Svc.RestaurarBackup(arquivo, Config.Subpasta("backups"));
+        AtualizarTudo();
+        Sucesso("Backup restaurado. Os dados anteriores ficaram guardados em uma cópia de segurança.", ("Abrir pasta", () => Plat.Atual.Abrir(Path.GetDirectoryName(seguranca)!)));
     }
 
     public async Task BackupAsync()
@@ -129,7 +164,7 @@ public sealed class ConfigTela : Tela
         var caminho = await Plat.Atual.SalvarArquivo(Janela, "Salvar backup", Config.Subpasta("backups"), $"gestao-backup-{DateTime.Now:yyyy-MM-dd_HHmm}.db", "Banco de dados", "db");
         if (caminho == null) return;
         Svc.FazerBackup(caminho);
-        await Info($"Backup salvo em:\n{caminho}");
+        Sucesso("Backup salvo.", ("Abrir pasta", () => Plat.Atual.Abrir(Path.GetDirectoryName(caminho)!)));
     }
 
     void AbrirPasta(string? sub)
