@@ -1,0 +1,79 @@
+namespace GestaoComercial.Core;
+
+public record Categoria(long Id, string Nome, long Produtos);
+
+public record Pessoa(long Id, string Nome, string Documento, string Telefone, string Email, string Endereco, bool Ativo);
+
+public record PessoaDados(string Nome, string? Documento = null, string? Telefone = null, string? Email = null,
+                          string? Endereco = null, bool Ativo = true);
+
+public record Produto(long Id, string Codigo, string Nome, long? CategoriaId, string Categoria, string Unidade,
+                      long PrecoCusto, long PrecoVenda, long Estoque, long EstoqueMin, bool Ativo)
+{
+    /// <summary>Estoque no mínimo ou abaixo dele (inclui zerado).</summary>
+    public bool Baixo => Estoque <= EstoqueMin;
+}
+
+public record ProdutoDados(string Nome, string? Codigo = null, long? CategoriaId = null, string? Unidade = null,
+                           long PrecoCusto = 0, long PrecoVenda = 0, long EstoqueMin = 0, long EstoqueInicial = 0,
+                           bool Ativo = true);
+
+public record Empresa(string Nome, string Documento, string Endereco, string Telefone, string Rodape)
+{
+    public static Empresa Padrao => new("Minha Empresa", "", "", "", "Obrigado pela preferência!");
+}
+
+public record Movimento(long Id, string Data, long ProdutoId, string Codigo, string Nome, string Tipo,
+                        long Quantidade, long SaldoApos, string Referencia, string Obs);
+
+public record ItemEntradaInput(long ProdutoId, long Quantidade, long CustoUnit);
+public record ItemVendaInput(long ProdutoId, long Quantidade, long PrecoUnit);
+
+public record EntradaItem(long Id, long ProdutoId, string Codigo, string Nome, string Unidade, long Quantidade, long CustoUnit);
+
+public record Entrada(long Id, string Data, long FornecedorId, string Fornecedor, string NumeroDoc, string Obs,
+                      long Total, string Status, string MotivoCancelamento, List<EntradaItem> Itens)
+{
+    public bool Cancelada => Status == "CANCELADA";
+}
+
+public record VendaItem(long Id, long ProdutoId, string Codigo, string Descricao, string Unidade, long Quantidade,
+                        long PrecoUnit, long CustoUnit)
+{
+    public long Total => Quantidade * PrecoUnit;
+}
+
+public record Venda(long Id, string Data, long? ClienteId, string ClienteNome, string ClienteDoc, long Subtotal,
+                    long Desconto, long Total, string FormaPagamento, string Obs, string Status, string? CanceladaEm,
+                    string MotivoCancelamento, Empresa Emitente, List<VendaItem> Itens)
+{
+    public bool Cancelada => Status == "CANCELADA";
+}
+
+public record ResumoVendas(long Qtd, long Total, long Descontos, long Custo, long CanceladasQtd, long CanceladasTotal)
+{
+    public long Lucro => Total - Custo;
+    public long TicketMedio => Qtd > 0 ? Total / Qtd : 0;
+}
+
+public record MaisVendido(string Codigo, string Descricao, long Quantidade, long Receita);
+public record PorPagamento(string Forma, long Qtd, long Total);
+public record ResumoCategoria(string Categoria, long Produtos, long Unidades, long ValorCusto, long ValorVenda, long Baixos);
+public record EstoquePainel(long Produtos, long ValorCusto, long ValorVenda, long Baixos);
+
+public record Painel(ResumoVendas Hoje, ResumoVendas Mes, EstoquePainel Estoque, List<Produto> BaixoEstoque, List<Venda> Recentes);
+
+public enum TipoPessoa { Cliente, Fornecedor }
+
+public record Devedor(long ClienteId, string Nome, string Telefone, long Saldo, string? UltimaCompra);
+public record Recebimento(long Id, string Data, long ClienteId, string Cliente, long Valor, string Forma, string Obs, string Status, string MotivoEstorno)
+{
+    public bool Estornado => Status == "ESTORNADO";
+}
+/// <summary>Linha do extrato de fiado: Valor positivo = compra (aumenta a dívida), negativo = pagamento.</summary>
+public record LinhaExtrato(string Data, string Descricao, long Valor, long Saldo);
+public record MovCaixa(long Id, string Data, string Tipo, long Valor, string Motivo);
+public record ResumoCaixa(string Data, long Suprimentos, long Sangrias, long VendasQtd, long VendasTotal, long FiadoLancado,
+                          List<PorPagamento> VendasPorForma, long RecebimentosTotal, List<PorPagamento> RecebimentosPorForma,
+                          long DinheiroEsperado, List<MovCaixa> Movimentos);
+public record ItemReposicao(Produto Produto, long Sugestao);
