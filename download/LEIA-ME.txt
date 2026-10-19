@@ -1,0 +1,7 @@
+COMO USAR (Windows)
+1. Baixe GestaoComercial-Windows.zip
+2. Clique com o botão direito > Extrair tudo
+3. Dê dois cliques em GestaoComercial.exe
+
+Se aparecer "O Windows protegeu seu computador": clique em "Mais informações" e depois em "Executar assim mesmo".
+Seus dados ficam em %APPDATA%\GestaoComercial
