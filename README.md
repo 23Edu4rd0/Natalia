@@ -12,10 +12,12 @@ mesmas telas, mesmas regras e **o mesmo banco de dados** (`gestao.db`), então o
 
 ## Como usar (sem instalar nada)
 
-Os executáveis prontos ficam em `dist/` — um arquivo só, não precisa instalar .NET nem Python:
+Os executáveis prontos estão na pasta [`download/`](download/) — um arquivo só, não precisa instalar .NET nem Python:
 
-- **Windows:** `dist/windows-x64/GestaoComercial.exe` (dois cliques)
-- **Linux:** `dist/linux-x64/GestaoComercial` (`chmod +x` se necessário e execute)
+- **Windows:** [`download/GestaoComercial-Windows.zip`](download/GestaoComercial-Windows.zip) → extraia e dê dois cliques em `GestaoComercial.exe`
+- **Linux:** [`download/GestaoComercial-Linux.tar.gz`](download/GestaoComercial-Linux.tar.gz) → `tar -xzf` e execute `./GestaoComercial`
+
+(Ao gerar de novo com `./publicar.sh`, os arquivos saem em `dist/`.)
 
 > Na primeira vez o Windows pode mostrar o aviso "SmartScreen" (programa novo, sem assinatura digital):
 > clique em *Mais informações → Executar assim mesmo*.

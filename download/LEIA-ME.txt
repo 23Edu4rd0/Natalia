@@ -1,7 +1,17 @@
-COMO USAR (Windows)
+GESTÃO COMERCIAL 2.3.0
+
+WINDOWS
 1. Baixe GestaoComercial-Windows.zip
 2. Clique com o botão direito > Extrair tudo
 3. Dê dois cliques em GestaoComercial.exe
-
 Se aparecer "O Windows protegeu seu computador": clique em "Mais informações" e depois em "Executar assim mesmo".
-Seus dados ficam em %APPDATA%\GestaoComercial
+
+LINUX
+1. Baixe GestaoComercial-Linux.tar.gz
+2. tar -xzf GestaoComercial-Linux.tar.gz
+3. ./GestaoComercial   (se precisar: chmod +x GestaoComercial)
+
+O programa abre no MODO SIMPLES (só o necessário para vender).
+Para ver todas as funções: Configurações > Modo de uso > Avançado.
+
+Seus dados ficam em %APPDATA%\GestaoComercial (Windows) ou ~/.local/share/gestao-comercial (Linux).
