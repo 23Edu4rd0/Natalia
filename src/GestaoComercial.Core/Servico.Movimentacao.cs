@@ -232,6 +232,18 @@ public partial class Servico
               "GROUP BY forma_pagamento ORDER BY total DESC",
               r => new PorPagamento(r.S("forma_pagamento"), r.L("qtd"), r.L("total")), inicio, fim);
 
+    /// <summary>Total vendido em cada um dos últimos <paramref name="dias"/> dias (inclui hoje e dias sem venda).</summary>
+    public List<VendaDia> VendasPorDia(int dias = 14)
+    {
+        dias = Math.Clamp(dias, 1, 366);
+        var inicio = DateTime.Today.AddDays(-(dias - 1));
+        var porDia = Todos("SELECT substr(data,1,10) AS dia, COUNT(*) AS qtd, SUM(total) AS total FROM vendas WHERE status = 'CONCLUIDA' AND substr(data,1,10) >= ? GROUP BY dia",
+                           r => new VendaDia(r.S("dia"), r.L("qtd"), r.L("total")), inicio.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                     .ToDictionary(v => v.Data);
+        return Enumerable.Range(0, dias).Select(i => inicio.AddDays(i).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                         .Select(d => porDia.TryGetValue(d, out var v) ? v : new VendaDia(d, 0, 0)).ToList();
+    }
+
     public Painel ObterPainel()
     {
         var hoje = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

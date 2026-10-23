@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using GestaoComercial.Core;
@@ -20,15 +21,18 @@ public sealed class VendaTela : Tela
     public TextBox Desconto { get; }
     public TextBox Obs { get; }
     public TextBox ValorRecebido { get; }
-    readonly TextBlock lblSub = K.Rotulo("Subtotal", false, 13, Cores.Texto2), lblSubValor = K.Rotulo("R$ 0,00", false, 13);
-    readonly TextBlock lblDesc = K.Rotulo("Desconto", false, 13, Cores.Texto2), lblDescValor = K.Rotulo("", false, 13, Cores.Vermelho);
-    readonly TextBlock lblTotal = K.Rotulo("R$ 0,00", true, 32, "#15803D");
+    readonly TextBlock lblSub = K.Rotulo("Subtotal", false, 13.5, Cores.Texto2), lblSubValor = K.Rotulo("R$ 0,00", false, 13.5, Cores.Corpo);
+    readonly TextBlock lblDesc = K.Rotulo("Desconto", false, 13.5, Cores.Texto2), lblDescValor = K.Rotulo("", false, 13.5, Cores.Vermelho);
+    readonly TextBlock lblTotal = new() { Text = "R$ 0,00", FontSize = 34, FontWeight = FontWeight.Bold, Foreground = Cores.P(Cores.Texto), LetterSpacing = -0.5 };
     readonly TextBlock lblTroco = K.Rotulo("", true, 16);
-    readonly TextBlock lblClienteInfo = new() { FontSize = 12.5, TextWrapping = Avalonia.Media.TextWrapping.Wrap, IsVisible = false };
+    readonly TextBlock lblClienteInfo = new() { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, IsVisible = false };
+    readonly Border caixaInfoCliente;
     readonly StackPanel painelTroco;
     readonly StackPanel extras;
     readonly Button botaoExtras;
     readonly Grid linhaDesconto;
+    readonly Dictionary<string, Button> blocosPagamento = new();
+    readonly ComboBox outraForma;
     Dictionary<string, long?> clientes = new();
     bool finalizando;
 
@@ -39,7 +43,13 @@ public sealed class VendaTela : Tela
     public bool TrocoVisivel => painelTroco.IsVisible;
 
     public override string Titulo => "Nova venda";
-    public override string Subtitulo => "Leia o código de barras ou busque o produto. Digite “3x nome” para vender 3 de uma vez.";
+    public override string Subtitulo => "Digite o nome ou leia o código de barras. “3x nome” vende 3 de uma vez.";
+
+    static readonly (string Forma, string Rotulo, string Icone)[] Blocos =
+    {
+        ("Dinheiro", "Dinheiro", "dinheiro"), ("Pix", "Pix", "pix"), ("Cartão de débito", "Débito", "cartao"),
+        ("Cartão de crédito", "Crédito", "cartao"), ("Fiado", "Fiado", "receber"), ("Transferência", "Outra", "mais-horiz"),
+    };
 
     public VendaTela(MainWindow app) : base(app)
     {
@@ -48,7 +58,7 @@ public sealed class VendaTela : Tela
         Cliente = new AutoCompleteBox
         {
             Watermark = "Consumidor final (ou busque)", MinimumPrefixLength = 0, MaxDropDownHeight = 260, FilterMode = AutoCompleteFilterMode.Custom,
-            HorizontalAlignment = HorizontalAlignment.Stretch, MinHeight = 38,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             TextFilter = (busca, item) => string.IsNullOrWhiteSpace(busca) || Util.ChaveOrdenacao(item).Contains(Util.ChaveOrdenacao(busca.Trim())),
         };
         Cliente.GotFocus += (_, _) => { if (string.IsNullOrEmpty(Cliente.Text)) Cliente.IsDropDownOpen = true; };
@@ -60,26 +70,46 @@ public sealed class VendaTela : Tela
             AtualizarInfoCliente();
         };
         Pagamento = K.Combo(Servico.FormasPagamento, double.NaN, Servico.FormasPagamento[0]); Pagamento.HorizontalAlignment = HorizontalAlignment.Stretch;
-        Pagamento.SelectionChanged += (_, _) => { Recalcular(); AtualizarInfoCliente(); };
+        Pagamento.SelectionChanged += (_, _) => { MarcarPagamento(); Recalcular(); AtualizarInfoCliente(); };
         Desconto = K.Caixa("", double.NaN, "0,00 ou 10%"); K.AoMudarTexto(Desconto, Recalcular);
         ValorRecebido = K.Caixa("", double.NaN, "Quanto o cliente entregou?"); K.AoMudarTexto(ValorRecebido, Recalcular);
         Obs = K.Caixa("", double.NaN, "Opcional");
 
         var novoCliente = K.Botao("Novo", SeguroAsync(NovoClienteAsync), icone: "mais");
+        ToolTip.SetTip(novoCliente, "Cadastrar cliente novo");
         var gCliente = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         K.ColocarNaGrade(gCliente, Cliente, 0, 0); K.ColocarNaGrade(gCliente, K.Margem(novoCliente, 8, 0, 0, 0), 0, 1);
+        caixaInfoCliente = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6), IsVisible = false, Child = lblClienteInfo };
 
-        Button Chip(string texto, Action acao) { var b = K.Botao(texto, acao, classe: "chip"); b.Margin = new Thickness(0, 0, 6, 0); b.MinHeight = 28; b.Padding = new Thickness(10, 3); return b; }
-        var chipsDesconto = new StackPanel { Orientation = Orientation.Horizontal, Children = { Chip("5%", () => Desconto.Text = "5%"), Chip("10%", () => Desconto.Text = "10%"), Chip("Sem desconto", () => Desconto.Text = "") } };
-        var chipsRecebido = new StackPanel
+        // formas de pagamento como blocos (um clique); "Outra" mostra a lista com Transferência/Outro
+        var gradePag = new UniformGrid { Columns = 3 };
+        foreach (var (forma, rotulo, icone) in Blocos)
         {
-            Orientation = Orientation.Horizontal,
+            var b = new Button { Tag = "Pagamento: " + rotulo, Padding = new Thickness(6, 8), MinHeight = 60 };
+            b.Classes.Add("bloco");
+            b.HorizontalContentAlignment = HorizontalAlignment.Center;
+            var ic = Icones.Criar(icone, 18, Cores.Texto2); ic.HorizontalAlignment = HorizontalAlignment.Center;
+            b.Content = new StackPanel { Spacing = 4, Children = { ic, new TextBlock { Text = rotulo, FontSize = 13, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center } } };
+            var idx = gradePag.Children.Count;
+            b.Margin = new Thickness(idx % 3 == 0 ? 0 : 4, 0, idx % 3 == 2 ? 0 : 4, 8);
+            b.Click += (_, _) => Pagamento.SelectedItem = forma == "Transferência" && Pagamento.SelectedItem is "Outro" ? "Outro" : forma;
+            blocosPagamento[forma] = b;
+            gradePag.Children.Add(b);
+        }
+        outraForma = K.Combo(new[] { "Transferência", "Outro" }, double.NaN, "Transferência");
+        outraForma.HorizontalAlignment = HorizontalAlignment.Stretch; outraForma.IsVisible = false;
+        outraForma.SelectionChanged += (_, _) => { if (outraForma.SelectedItem is string f && Pagamento.SelectedItem as string != f && outraForma.IsVisible) Pagamento.SelectedItem = f; };
+
+        Button Chip(string texto, Action acao) { var b = K.Botao(texto, acao, classe: "chip"); b.Margin = new Thickness(0, 0, 6, 6); return b; }
+        var chipsDesconto = new WrapPanel { Children = { Chip("5%", () => Desconto.Text = "5%"), Chip("10%", () => Desconto.Text = "10%"), Chip("Sem desconto", () => Desconto.Text = "") } };
+        var chipsRecebido = new WrapPanel
+        {
             Children = { Chip("Valor exato", () => ValorRecebido.Text = Util.FmtDinheiro(Editor.Total - SafeDesconto(), false)), Chip("R$ 20", () => ValorRecebido.Text = "20,00"), Chip("R$ 50", () => ValorRecebido.Text = "50,00"), Chip("R$ 100", () => ValorRecebido.Text = "100,00") },
         };
         painelTroco = new StackPanel
         {
-            Spacing = 8, IsVisible = false,
-            Children = { K.Campo("Valor recebido", ValorRecebido), chipsRecebido, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { K.Rotulo("Troco:", false, 14, Cores.Texto2), lblTroco } } },
+            Spacing = 6, IsVisible = false,
+            Children = { K.Campo("Valor recebido", ValorRecebido), chipsRecebido, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { K.Rotulo("Troco", false, 14, Cores.Texto2), lblTroco } } },
         };
 
         linhaDesconto = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), IsVisible = false };
@@ -87,15 +117,18 @@ public sealed class VendaTela : Tela
         var linhaSub = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         K.ColocarNaGrade(linhaSub, lblSub, 0, 0); K.ColocarNaGrade(linhaSub, lblSubValor, 0, 1);
 
-        var finalizar = K.Botao("Finalizar venda   (F9)", SeguroAsync(FinalizarAsync), classe: "verde");
-        finalizar.Tag = "Finalizar venda e emitir nota";
-        finalizar.HorizontalAlignment = HorizontalAlignment.Stretch; finalizar.HorizontalContentAlignment = HorizontalAlignment.Center;
-        finalizar.FontSize = 16; finalizar.MinHeight = 52;
+        var finalizar = new Button { Tag = "Finalizar venda e emitir nota", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, MinHeight = 56, FontSize = 16 };
+        finalizar.Classes.Add("verde");
+        var conteudoFin = new DockPanel();
+        var f9 = K.Tecla("F9", clara: true); DockPanel.SetDock(f9, Dock.Right); conteudoFin.Children.Add(f9);
+        conteudoFin.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(28, 0, 0, 0), Children = { Icones.Criar("ok", 20, "#FFFFFF"), new TextBlock { Text = "Finalizar venda", VerticalAlignment = VerticalAlignment.Center } } });
+        finalizar.Content = conteudoFin;
+        finalizar.Click += (_, _) => SeguroAsync(FinalizarAsync)();
 
         // modo simples: desconto, troco e observação ficam atrás de um botão (modo avançado mostra sempre)
         extras = new StackPanel
         {
-            Spacing = 14,
+            Spacing = 16,
             Children = { new StackPanel { Spacing = 6, Children = { K.Campo("Desconto (R$ ou %)", Desconto), chipsDesconto } }, painelTroco, K.Campo("Observações", Obs) },
         };
         botaoExtras = K.Botao("＋ Desconto, troco ou observação", () => MostrarExtras(!extras.IsVisible), classe: "chip");
@@ -103,29 +136,56 @@ public sealed class VendaTela : Tela
         botaoExtras.IsVisible = !App.Avancado;
         extras.IsVisible = App.Avancado;
 
-        var resumo = new StackPanel
+        var topo = new StackPanel
         {
-            Spacing = 14,
+            Spacing = 18,
             Children =
             {
                 K.H2("Resumo da venda"),
-                new StackPanel { Spacing = 6, Children = { K.Campo("Cliente", gCliente), lblClienteInfo } },
-                K.Campo("Forma de pagamento", Pagamento),
+                new StackPanel { Spacing = 8, Children = { K.Campo("Cliente", gCliente), caixaInfoCliente } },
+                new StackPanel { Spacing = 6, Children = { K.Etiqueta("Forma de pagamento"), K.Margem(gradePag, 0, 0, 0, -8), outraForma } },
                 botaoExtras,
                 extras,
-                new Border { Height = 1, Background = Cores.P("#EEF0F5"), Margin = new Thickness(0, 2) },
-                linhaSub, linhaDesconto,
-                new StackPanel { Spacing = 0, Children = { K.Etiqueta("Total a pagar"), lblTotal } },
-                finalizar,
             },
         };
-        var cartaoResumo = K.Cartao(new ScrollViewer { Content = resumo, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
-        cartaoResumo.Width = 350; cartaoResumo.Margin = new Thickness(22, 0, 0, 0);
+        var totalCaixa = new StackPanel { Spacing = 0, Children = { K.Etiqueta("Total a pagar"), lblTotal } };
+        var baixo = new StackPanel
+        {
+            Spacing = 10,
+            Children = { linhaSub, linhaDesconto, new Border { Height = 1, Background = Cores.P(Cores.Linha), Margin = new Thickness(0, 4) }, totalCaixa, K.Margem(finalizar, 0, 6, 0, 0) },
+        };
+        var cartaoBaixo = new Border { Child = baixo, Padding = new Thickness(22, 16, 22, 22), BorderBrush = Cores.P(Cores.Linha), BorderThickness = new Thickness(0, 1, 0, 0), Background = Cores.P("#FCFCFD") };
+        var corpoResumo = new DockPanel();
+        DockPanel.SetDock(cartaoBaixo, Dock.Bottom); corpoResumo.Children.Add(cartaoBaixo);
+        corpoResumo.Children.Add(new ScrollViewer { Content = K.Margem(topo, 22, 20, 22, 20), HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
+        var cartaoResumo = K.Cartao(corpoResumo);
+        cartaoResumo.Padding = new Thickness(0); cartaoResumo.ClipToBounds = true;
+        cartaoResumo.Width = 384; cartaoResumo.Margin = new Thickness(20, 0, 0, 0);
 
+        // o resumo (com o botão Finalizar) fica sempre visível; só a coluna dos produtos rola em telas baixas
         var raiz = new DockPanel();
         DockPanel.SetDock(cartaoResumo, Dock.Right);
-        raiz.Children.Add(cartaoResumo); raiz.Children.Add(Editor);
+        raiz.Children.Add(cartaoResumo); raiz.Children.Add(K.Rolagem(Editor, 600));
         Content = raiz;
+        MarcarPagamento();
+    }
+
+    /// <summary>Destaca o bloco da forma de pagamento escolhida.</summary>
+    void MarcarPagamento()
+    {
+        var f = Pagamento.SelectedItem as string ?? "";
+        var outra = f is "Transferência" or "Outro";
+        foreach (var (forma, b) in blocosPagamento)
+        {
+            var ativo = forma == f || (forma == "Transferência" && outra);
+            if (ativo) b.Classes.Add("ativo"); else b.Classes.Remove("ativo");
+            var pilha = (StackPanel)b.Content!;
+            Icones.Pintar(pilha.Children[0], ativo ? Cores.Primaria : Cores.Texto2);
+            ((TextBlock)pilha.Children[1]).Foreground = Cores.P(ativo ? Cores.Azul : Cores.Corpo);
+        }
+        if (outraForma == null) return;
+        outraForma.IsVisible = outra;
+        if (outra && outraForma.SelectedItem as string != f) outraForma.SelectedItem = f;
     }
 
     public override void Atualizar()
@@ -180,7 +240,9 @@ public sealed class VendaTela : Tela
         }
         lblClienteInfo.IsVisible = msg != null;
         lblClienteInfo.Text = msg ?? "";
-        lblClienteInfo.Foreground = Cores.P(cor);
+        lblClienteInfo.Foreground = Cores.P(cor == Cores.Verde ? "#065F46" : cor == Cores.Ambar ? "#92400E" : Cores.Texto2);
+        caixaInfoCliente.IsVisible = msg != null;
+        caixaInfoCliente.Background = Cores.P(cor == Cores.Verde ? "#ECFDF5" : cor == Cores.Ambar ? "#FFFBEB" : Cores.CinzaFundo);
     }
 
     long LerDesconto() => Util.ParseDesconto(Desconto.Text, Editor.Total);
@@ -312,7 +374,7 @@ public sealed class NotasTela : Tela
     public ComboBox Situacao { get; }
     public TextBox Busca { get; }
     public Tabela Tabela { get; }
-    readonly TextBlock rodape = K.Rotulo("", true);
+    readonly TextBlock rodape = K.Rotulo("", true, null, Cores.Corpo);
     public string TextoRodape => rodape.Text ?? "";
 
     public override string Titulo => "Vendas";
@@ -320,28 +382,28 @@ public sealed class NotasTela : Tela
 
     public NotasTela(MainWindow app) : base(app)
     {
-        De = K.Caixa(Util.InicioMesBr(), 120); Ate = K.Caixa(Util.HojeBr(), 120);
+        De = K.Data(Util.InicioMesBr()); Ate = K.Data(Util.HojeBr());
         Situacao = K.Combo(Situacoes.Keys, 140, "Todas");
-        Busca = K.Caixa("", 220, "Nº da nota ou cliente");
-        var filtros = K.Linha(10, K.Campo("De", De), K.Campo("Até", Ate), K.Campo("Situação", Situacao), K.Campo("Buscar", Busca));
-        var filtrar = K.Botao("Filtrar", Seguro(Atualizar), icone: "busca", classe: "primario"); filtrar.VerticalAlignment = VerticalAlignment.Bottom;
-        filtros.Children.Add(filtrar);
+        Busca = K.CaixaBusca("Nº da nota ou cliente", 240);
+        var filtrar = K.Botao("Filtrar", Seguro(Atualizar), icone: "busca");
+        var filtros = K.Fila(10, Busca, K.Linha(8, De, K.Rotulo("até", false, 13, Cores.Texto2), Ate), Situacao, filtrar);
         K.AoApertarEnter(Busca, Seguro(Atualizar));
+        K.AoApertarEnter(De, Seguro(Atualizar)); K.AoApertarEnter(Ate, Seguro(Atualizar));
         Situacao.SelectionChanged += (_, _) => Seguro(Atualizar)();
 
-        var acoes = K.Barra(
-            K.Linha(K.Botao("Ver nota", SeguroAsync(VisualizarAsync), icone: "ver", classe: "primario"),
-                    K.Botao("Imprimir / PDF", SeguroAsync(ImprimirAsync), icone: "imprimir"),
-                    K.Botao("Cupom 80 mm", SeguroAsync(CupomAsync), icone: "notas"),
-                    K.Botao("WhatsApp", SeguroAsync(WhatsAppAsync), icone: "whatsapp"),
-                    K.Botao("Cancelar venda", SeguroAsync(CancelarAsync), icone: "lixeira", classe: "perigo")),
-            K.Botao("Exportar CSV", SeguroAsync(ExportarAsync), icone: "exportar"));
-        acoes.Margin = new Thickness(0, 14, 0, 14);
+        var acoes = K.Fila(4,
+            K.Botao("Ver nota", SeguroAsync(VisualizarAsync), icone: "ver", classe: "fantasma"),
+            K.Botao("Imprimir / PDF", SeguroAsync(ImprimirAsync), icone: "imprimir", classe: "fantasma"),
+            K.Botao("Cupom 80 mm", SeguroAsync(CupomAsync), icone: "notas", classe: "fantasma"),
+            K.Botao("WhatsApp", SeguroAsync(WhatsAppAsync), icone: "whatsapp", classe: "fantasma"),
+            K.Botao("Cancelar venda", SeguroAsync(CancelarAsync), icone: "lixeira", classe: "fantasma perigo"),
+            K.Botao("Exportar", SeguroAsync(ExportarAsync), icone: "exportar", classe: "fantasma"));
 
-        Tabela = new Tabela(new Col("Nota", 90), new Col("Data", 160), new Col("Cliente", 240, Expande: true), new Col("Pagamento", 150),
-                            new Col("Desconto", 100, true), new Col("Total", 120, true), new Col("Situação", 120, Chip: true));
-        rodape.HorizontalAlignment = HorizontalAlignment.Right; rodape.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(new StackPanel { Children = { filtros, acoes } }, Tabela.ComVazio("Nenhuma venda neste período.\nAltere as datas acima ou faça uma venda em “Nova venda”."), rodape);
+        Tabela = new Tabela(new Col("Nota", 100), new Col("Data", 160), new Col("Cliente", 200, Expande: true), new Col("Pagamento", 160),
+                            new Col("Desconto", 110, true), new Col("Total", 130, true), new Col("Situação", 130, Chip: true));
+        rodape.FontSize = 13;
+        Content = K.Lista(Tabela, K.Ferramentas(filtros, acoes), rodape,
+                          "Nenhuma venda neste período.\nAltere as datas acima ou faça uma venda em “Nova venda”.", "notas");
         Tabela.Duplo += SeguroAsync(VisualizarAsync);
     }
 

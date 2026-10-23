@@ -60,7 +60,8 @@ public sealed class MainWindow : JanelaBase
     readonly ContentControl pagina = new();
     readonly TextBlock titulo = K.H1(""), subtitulo = K.Discreto("");
     readonly ContentControl acoes = new() { VerticalAlignment = VerticalAlignment.Center };
-    readonly TextBlock nomeEmpresa = new() { FontSize = 12, Foreground = Cores.P("#A5B4FC"), TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock nomeEmpresa = new() { FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Cores.P(Cores.Texto), TextTrimming = TextTrimming.CharacterEllipsis };
+    const string CorIconeMenu = "#64748B", CorIconeMenuAtivo = "#4338CA";
     readonly StackPanel pilhaToasts = new() { Spacing = 8, VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 24, 24), MaxWidth = 500 };
     readonly Dictionary<string, (long Versao, DateTime Dia)> ultimaAtualizacao = new();
     long versaoEmpresa = -1;
@@ -74,21 +75,21 @@ public sealed class MainWindow : JanelaBase
         Svc = svc;
         Avancado = svc.ObterConfig(ConfigModo, "simples") == "avancado";
         Title = $"{Config.NomeApp} {Config.Versao}";
-        Width = 1280; Height = 800; MinWidth = 1100; MinHeight = 660;
+        Width = 1360; Height = 860; MinWidth = 1100; MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        var barra = new StackPanel { Spacing = 3, Margin = new Thickness(12, 4, 12, 12) };
+        var barra = new StackPanel { Spacing = 2, Margin = new Thickness(14, 2, 14, 12) };
         TextBlock? grupoAtual = null;
         void Grupo(string nome)
         {
-            grupoAtual = new TextBlock { Text = nome.ToUpperInvariant(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Cores.P("#818CF8"), Margin = new Thickness(14, 12, 0, 3) };
+            grupoAtual = new TextBlock { Text = nome.ToUpperInvariant(), FontSize = 11, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.6, Foreground = Cores.P(Cores.Texto3), Margin = new Thickness(12, 16, 0, 4) };
             barra.Children.Add(grupoAtual);
         }
         void Item(string nome, string icone, Func<Tela> fabrica, string? dica = null, bool soAvancado = false)
         {
             Telas.Adicionar(nome, fabrica);
-            var ic = Icones.Criar(icone, 20, "#A5B4FC");
-            var botao = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { ic, new TextBlock { Text = nome, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 } } } };
+            var ic = Icones.Criar(icone, 19, CorIconeMenu);
+            var botao = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { ic, new TextBlock { Text = nome, VerticalAlignment = VerticalAlignment.Center } } } };
             botao.Classes.Add("nav");
             botao.Tag = nome;
             if (dica != null) ToolTip.SetTip(botao, dica);
@@ -116,20 +117,41 @@ public sealed class MainWindow : JanelaBase
         Item("Configurações", "config", () => new ConfigTela(this));
         AplicarMenu();
 
-        // marca
+        // marca: logotipo com degradê + nome da loja
         var logo = new Border
         {
-            Width = 40, Height = 40, CornerRadius = new CornerRadius(12), Background = Cores.P(Cores.Primaria),
-            Child = Icones.Criar("sacola", 22, "#FFFFFF"),
+            Width = 40, Height = 40, CornerRadius = new CornerRadius(12),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.Parse("#6366F1"), 0), new GradientStop(Color.Parse("#A855F7"), 1) },
+            },
+            BoxShadow = BoxShadows.Parse("0 4 10 -2 #556366F1"),
+            Child = Icones.Criar("sacola", 21, "#FFFFFF"),
         };
         logo.Child!.HorizontalAlignment = HorizontalAlignment.Center;
-        var marca = new StackPanel
+        var marca = new DockPanel { Margin = new Thickness(22, 22, 16, 10) };
+        DockPanel.SetDock(logo, Dock.Left); marca.Children.Add(logo);
+        marca.Children.Add(new StackPanel
         {
-            Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(20, 22, 16, 8),
-            Children = { logo, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { new TextBlock { Text = "Gestão Comercial", FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Brushes.White }, nomeEmpresa } } },
-        };
-        var rodapeMenu = new StackPanel { Margin = new Thickness(20, 8, 16, 16), Children = { new TextBlock { Text = $"Versão {Config.Versao}", FontSize = 11, Foreground = Cores.P("#818CF8") }, new TextBlock { Text = "F1 ajuda  ·  F2 nova venda  ·  F9 finalizar", FontSize = 11, Foreground = Cores.P("#818CF8") } } };
-        var lateral = new Border { Background = Cores.P("#1E1B4B"), Width = 250 };
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0), Spacing = 1,
+            Children = { nomeEmpresa, new TextBlock { Text = "Gestão Comercial", FontSize = 12, Foreground = Cores.P(Cores.Texto3) } },
+        });
+
+        // rodapé do menu: atalho fixo para vender + versão
+        var atalhoVenda = new Button { Tag = "Atalho nova venda", HorizontalAlignment = HorizontalAlignment.Stretch, MinHeight = 44 };
+        atalhoVenda.Classes.Add("primario");
+        var conteudoAtalho = new DockPanel();
+        var f2 = K.Tecla("F2", clara: true); DockPanel.SetDock(f2, Dock.Right); conteudoAtalho.Children.Add(f2);
+        conteudoAtalho.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { Icones.Criar("venda", 18, "#FFFFFF"), new TextBlock { Text = "Nova venda", VerticalAlignment = VerticalAlignment.Center } } });
+        atalhoVenda.Content = conteudoAtalho;
+        atalhoVenda.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        atalhoVenda.Click += (_, _) => { IrPara("Nova venda"); ((VendaTela)Telas["Nova venda"]).Editor.Focar(); };
+        var ajuda = new TextBlock { Text = $"Versão {Config.Versao}  ·  F1 ajuda", FontSize = 11.5, Foreground = Cores.P(Cores.Texto3), HorizontalAlignment = HorizontalAlignment.Center };
+        var rodapeMenu = new StackPanel { Spacing = 12, Margin = new Thickness(16, 10, 16, 18), Children = { atalhoVenda, ajuda } };
+        // tela baixa: o atalho some (o item "Nova venda" do menu continua lá) para o menu caber sem rolar
+        SizeChanged += (_, e) => atalhoVenda.IsVisible = e.NewSize.Height >= 820;
+        var lateral = new Border { Background = Brushes.White, Width = 252, BorderBrush = Cores.P(Cores.Borda), BorderThickness = new Thickness(0, 0, 1, 0) };
         var docaLateral = new DockPanel();
         DockPanel.SetDock(marca, Dock.Top); DockPanel.SetDock(rodapeMenu, Dock.Bottom);
         docaLateral.Children.Add(marca); docaLateral.Children.Add(rodapeMenu);
@@ -137,10 +159,10 @@ public sealed class MainWindow : JanelaBase
         lateral.Child = docaLateral;
 
         // cabeçalho da página
-        var textos = new StackPanel { Spacing = 2, Children = { titulo, subtitulo } };
-        var cabecalho = new DockPanel { Margin = new Thickness(32, 26, 32, 16) };
+        var textos = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Children = { titulo, subtitulo } };
+        var cabecalho = new DockPanel { Margin = new Thickness(36, 28, 36, 22) };
         DockPanel.SetDock(acoes, Dock.Right); cabecalho.Children.Add(acoes); cabecalho.Children.Add(textos);
-        pagina.Margin = new Thickness(32, 0, 32, 24);
+        pagina.Margin = new Thickness(36, 0, 36, 28);
 
         var conteudo = new DockPanel();
         DockPanel.SetDock(cabecalho, Dock.Top);
@@ -252,7 +274,7 @@ public sealed class MainWindow : JanelaBase
         {
             var ativo = m == item;
             if (ativo) m.Botao.Classes.Add("ativo"); else m.Botao.Classes.Remove("ativo");
-            Icones.Pintar(m.IconeCtl, ativo ? "#FFFFFF" : "#A5B4FC");
+            Icones.Pintar(m.IconeCtl, ativo ? CorIconeMenuAtivo : CorIconeMenu);
         }
         pagina.Content = Telas[nome];
         Mostrar(forcar: false);

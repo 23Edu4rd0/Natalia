@@ -11,10 +11,10 @@ namespace GestaoComercial.App.Ui;
 public sealed class CaixaTela : Tela
 {
     public TextBox Data { get; }
-    readonly K.Indicador gaveta = new("Na gaveta", "caixa", "#4F46E5", "#E0E7FF");
-    readonly K.Indicador vendido = new("Vendido", "venda", "#0E7490", "#CFFAFE");
-    readonly K.Indicador fiado = new("No fiado", "receber", "#B45309", "#FEF3C7");
-    readonly K.Indicador recebido = new("Fiado pago", "ok", "#16A34A", "#DCFCE7");
+    readonly K.Indicador gaveta = new("Dinheiro na gaveta", "dinheiro", "#4F46E5", "#EEF2FF");
+    readonly K.Indicador vendido = new("Vendido no dia", "venda", "#0891B2", "#ECFEFF");
+    readonly K.Indicador fiado = new("Vendido no fiado", "receber", "#D97706", "#FFFBEB");
+    readonly K.Indicador recebido = new("Fiado recebido", "ok", "#059669", "#ECFDF5");
     readonly Tabela tForma, tMovs;
     ResumoCaixa? resumo;
     public ResumoCaixa? Resumo => resumo;
@@ -35,26 +35,23 @@ public sealed class CaixaTela : Tela
             K.Botao("Retirada", SeguroAsync(() => RegistrarAsync("SANGRIA")), icone: "menos"),
             K.Botao("Imprimir fechamento", SeguroAsync(ImprimirAsync), icone: "imprimir", classe: "primario"));
 
-        Data = K.Caixa(Util.HojeBr(), 130);
-        var filtros = K.Linha(10, K.Campo("Dia", Data), K.Botao("Hoje", Seguro(() => { Data.Text = Util.HojeBr(); Atualizar(); })), K.Botao("Ver", Seguro(Atualizar)));
-        ((Control)filtros.Children[1]).VerticalAlignment = VerticalAlignment.Bottom; ((Control)filtros.Children[2]).VerticalAlignment = VerticalAlignment.Bottom;
+        Data = K.Data(Util.HojeBr());
+        var filtros = K.Linha(8, Data, K.Botao("Ver", Seguro(Atualizar)), K.Botao("Hoje", Seguro(() => { Data.Text = Util.HojeBr(); Atualizar(); }), classe: "fantasma"));
+        filtros.Margin = new Thickness(0, 0, 0, 18);
         K.AoApertarEnter(Data, Seguro(Atualizar));
 
-        var cartoes = new UniformGrid { Rows = 1, Columns = 4, Margin = new Thickness(0, 16, 0, 16) };
-        foreach (var c in new[] { gaveta, vendido, fiado, recebido }) { c.Margin = new Thickness(0, 0, 14, 0); cartoes.Children.Add(c); }
+        var cartoes = K.Colunas(18, gaveta, vendido, fiado, recebido);
+        cartoes.Margin = new Thickness(0, 0, 0, 20);
 
-        tForma = new Tabela(new Col("Forma de pagamento", 200, Expande: true), new Col("Vendas", 90, true), new Col("Total", 120, true));
-        tMovs = new Tabela(new Col("Hora", 80), new Col("Tipo", 150, Chip: true), new Col("Motivo", 200, Expande: true), new Col("Valor", 110, true));
-        var excluir = K.Botao("Excluir lançamento", SeguroAsync(ExcluirAsync), icone: "lixeira", classe: "perigo"); excluir.Margin = new Thickness(0, 10, 0, 0);
+        tForma = new Tabela(new Col("Forma de pagamento", 180, Expande: true), new Col("Vendas", 90, true), new Col("Total", 130, true));
+        tMovs = new Tabela(new Col("Hora", 80), new Col("Tipo", 150, Chip: true), new Col("Motivo", 160, Expande: true), new Col("Valor", 120, true));
+        var excluir = K.Botao("Excluir lançamento", SeguroAsync(ExcluirAsync), icone: "lixeira", classe: "fantasma perigo");
+        var lForma = K.Lista(tForma, K.Ferramentas(K.H2("Vendas por forma de pagamento"), null), vazio: "Nenhuma venda neste dia.", iconeVazio: "venda");
+        var lMovs = K.Lista(tMovs, K.Ferramentas(K.H2("Entradas e retiradas"), excluir), vazio: "Nenhuma entrada de troco ou retirada.\nUse os botões lá em cima para registrar.", iconeVazio: "caixa");
 
-        var g = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), RowDefinitions = new RowDefinitions("Auto,*,Auto") };
-        K.ColocarNaGrade(g, K.H2("Vendas por forma de pagamento"), 0, 0);
-        K.ColocarNaGrade(g, K.Margem(K.H2("Entradas e retiradas do caixa"), 14, 0, 0, 0), 0, 1);
-        tForma.Margin = new Thickness(0, 10, 14, 0); tMovs.Margin = new Thickness(14, 10, 0, 0);
-        K.ColocarNaGrade(g, tForma, 1, 0); K.ColocarNaGrade(g, tMovs, 1, 1);
-        excluir.HorizontalAlignment = HorizontalAlignment.Right; excluir.Margin = new Thickness(0, 10, 0, 0);
-        K.ColocarNaGrade(g, excluir, 2, 1);
-        Content = K.Doca(new StackPanel { Children = { filtros, cartoes } }, g);
+        var g = new Grid { ColumnDefinitions = new ColumnDefinitions("*,20,*") };
+        K.ColocarNaGrade(g, lForma, 0, 0); K.ColocarNaGrade(g, lMovs, 0, 2);
+        Content = K.Rolagem(K.Doca(new StackPanel { Children = { filtros, cartoes } }, g), 620);
     }
 
     public override void Atualizar()
@@ -112,8 +109,8 @@ public sealed class CaixaTela : Tela
 /// <summary>Fiado: quem está devendo, receber pagamentos, extrato e cobrança por WhatsApp.</summary>
 public sealed class ReceberTela : Tela
 {
-    readonly K.Indicador total = new("Total a receber", "receber", "#B45309", "#FEF3C7");
-    readonly K.Indicador quantos = new("Clientes devendo", "clientes", "#4F46E5", "#E0E7FF");
+    readonly K.Indicador total = new("Total a receber", "receber", "#D97706", "#FFFBEB");
+    readonly K.Indicador quantos = new("Clientes devendo", "clientes", "#4F46E5", "#EEF2FF");
     public Tabela Tabela { get; }
     public K.Indicador Total => total;
     List<Devedor> devedores = new();
@@ -125,19 +122,37 @@ public sealed class ReceberTela : Tela
 
     public ReceberTela(MainWindow app) : base(app)
     {
-        acoes = K.Botao("Receber pagamento", SeguroAsync(ReceberAsync), icone: "caixa", classe: "primario");
-        var cartoes = new UniformGrid { Rows = 1, Columns = 3, Margin = new Thickness(0, 0, 0, 16) };
-        total.Margin = new Thickness(0, 0, 14, 0); quantos.Margin = new Thickness(0, 0, 14, 0);
-        cartoes.Children.Add(total); cartoes.Children.Add(quantos);
-        Tabela = new Tabela(new Col("Cliente", 240, Expande: true), new Col("Telefone", 160), new Col("Última compra no fiado", 190), new Col("Deve", 140, true));
-        var barra = K.Linha(K.Botao("Receber pagamento", SeguroAsync(ReceberAsync), icone: "caixa", classe: "primario"),
-                            K.Botao("Ver extrato", SeguroAsync(ExtratoAsync), icone: "ver"),
-                            K.Botao("Cobrar no WhatsApp", SeguroAsync(CobrarAsync), icone: "whatsapp"),
-                            K.Botao("Imprimir extrato", SeguroAsync(ImprimirAsync), icone: "imprimir"));
-        barra.Margin = new Thickness(0, 0, 0, 14);
-        var dica = K.Discreto("Para vender no fiado: em \"Nova venda\" escolha o cliente e a forma de pagamento \"Fiado\".");
-        dica.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(new StackPanel { Children = { cartoes, barra } }, Tabela.ComVazio("Ninguém está devendo. Tudo em dia!\nPara vender no fiado, escolha o cliente e a forma “Fiado” na venda."), dica);
+        acoes = K.Botao("Receber pagamento", SeguroAsync(ReceberAsync), icone: "dinheiro", classe: "primario");
+        var dica = new Border
+        {
+            Background = Cores.P(Cores.PrimariaSuave), CornerRadius = new CornerRadius(14), Padding = new Thickness(20, 18), BorderBrush = Cores.P("#E0E7FF"), BorderThickness = new Thickness(1),
+            Child = new DockPanel
+            {
+                Children =
+                {
+                    K.Margem(K.Bolha("info", Cores.Primaria, "#FFFFFF", 40), 0, 0, 14, 0),
+                    new StackPanel
+                    {
+                        Spacing = 4, VerticalAlignment = VerticalAlignment.Center,
+                        Children =
+                        {
+                            new TextBlock { Text = "Como vender no fiado", FontWeight = Avalonia.Media.FontWeight.SemiBold, FontSize = 14, Foreground = Cores.P(Cores.Azul) },
+                            new TextBlock { Text = "Na Nova venda, escolha a cliente e a forma de pagamento “Fiado”. A dívida aparece aqui na hora.", FontSize = 13, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = Cores.P("#4338CA") },
+                        },
+                    },
+                },
+            },
+        };
+        DockPanel.SetDock(((DockPanel)dica.Child).Children[0], Dock.Left);
+        var cartoes = K.Colunas(18, total, quantos, dica);
+        cartoes.Margin = new Thickness(0, 0, 0, 20);
+        Tabela = new Tabela(new Col("Cliente", 200, Expande: true), new Col("Telefone", 160), new Col("Última compra no fiado", 200), new Col("Deve", 140, true));
+        var barra = K.Fila(4, K.Botao("Ver extrato", SeguroAsync(ExtratoAsync), icone: "ver", classe: "fantasma"),
+                              K.Botao("Cobrar no WhatsApp", SeguroAsync(CobrarAsync), icone: "whatsapp", classe: "fantasma"),
+                              K.Botao("Imprimir extrato", SeguroAsync(ImprimirAsync), icone: "imprimir", classe: "fantasma"));
+        var lista = K.Lista(Tabela, K.Ferramentas(K.H2("Quem está devendo"), barra), K.Discreto("Dica: dê dois cliques num nome para ver o extrato."),
+                            "Ninguém está devendo. Tudo em dia!\nPara vender no fiado, escolha o cliente e a forma “Fiado” na venda.", "ok");
+        Content = K.Doca(cartoes, lista);
         Tabela.Duplo += SeguroAsync(ExtratoAsync);
     }
 

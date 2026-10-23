@@ -14,7 +14,7 @@ public sealed class EntradasTela : Tela
     public TextBox Data { get; }
     public TextBox Obs { get; }
     public EditorItens Editor { get; }
-    readonly TextBlock lblTotal = K.Rotulo("TOTAL: R$ 0,00", true, 20);
+    readonly TextBlock lblTotal = K.Rotulo("R$ 0,00", true, 26);
     Dictionary<string, long> fornecedores = new();
 
     public override string Titulo => "Entrada de mercadorias";
@@ -22,23 +22,22 @@ public sealed class EntradasTela : Tela
 
     public EntradasTela(MainWindow app) : base(app)
     {
-        Fornecedor = K.Combo(Array.Empty<string>(), 320);
-        Documento = K.Caixa("", 150); Data = K.Caixa(Util.HojeBr(), 110); Obs = K.Caixa("", 340);
-        var topo = K.Linha(14, K.Campo("Fornecedor", Fornecedor), K.Campo("Nº do documento / NF", Documento), K.Campo("Data", Data));
-        topo.Margin = new Thickness(0, 0, 0, 14);
+        Fornecedor = K.Combo(Array.Empty<string>(), 300);
+        Documento = K.Caixa("", 170, "Opcional"); Data = K.Data(Util.HojeBr()); Obs = K.Caixa("", 300, "Opcional");
+        Fornecedor.PlaceholderText = "Escolha o fornecedor";
+        var topo = K.Cartao(K.Fila(16, K.Campo("Fornecedor", Fornecedor), K.Campo("Nº do documento / NF", Documento), K.Campo("Data", Data), K.Campo("Observações", Obs)));
+        topo.Margin = new Thickness(0, 0, 0, 20);
 
-        Editor = new EditorItens(Svc, false, () => lblTotal.Text = $"TOTAL: {Util.FmtDinheiro(Editor!.Total)}");
+        Editor = new EditorItens(Svc, false, () => lblTotal.Text = Util.FmtDinheiro(Editor!.Total));
 
         var registrar = K.Botao("Registrar entrada no estoque", SeguroAsync(RegistrarAsync), icone: "ok", classe: "verde");
-        registrar.Padding = new Thickness(20, 10); registrar.HorizontalAlignment = HorizontalAlignment.Right; registrar.MinHeight = 46;
-        lblTotal.HorizontalAlignment = HorizontalAlignment.Right; lblTotal.Foreground = Cores.P("#15803D");
-        var dir = new StackPanel { Spacing = 4, Children = { lblTotal, registrar } };
-        var esq = K.Linha(10, K.Campo("Observações", Obs), K.Botao("Histórico de entradas", SeguroAsync(HistoricoAsync), icone: "ver"));
-        ((Control)esq.Children[1]).VerticalAlignment = VerticalAlignment.Bottom;
-        esq.VerticalAlignment = VerticalAlignment.Bottom;
-        var rodape = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
-        DockPanel.SetDock(dir, Dock.Right); rodape.Children.Add(dir); rodape.Children.Add(esq);
-        Content = K.Doca(topo, Editor, rodape);
+        registrar.Padding = new Thickness(22, 0); registrar.MinHeight = 50; registrar.FontSize = 15;
+        lblTotal.FontSize = 26; lblTotal.Foreground = Cores.P(Cores.Texto);
+        var dir = K.Linha(24, new StackPanel { Spacing = 0, Children = { K.Etiqueta("Total da entrada"), lblTotal } }, registrar);
+        var historico = K.Botao("Histórico de entradas", SeguroAsync(HistoricoAsync), icone: "notas", classe: "fantasma");
+        var rodape = K.Cartao(K.Ferramentas(historico, dir));
+        rodape.Margin = new Thickness(0, 20, 0, 0); rodape.Padding = new Thickness(20, 16);
+        Content = K.Rolagem(K.Doca(topo, Editor, rodape), 720);
     }
 
     public override void Atualizar()
@@ -88,7 +87,7 @@ public sealed class HistoricoEntradasDialog : JanelaBase
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
         tabela = new Tabela(new Col("Nº", 80), new Col("Data", 130), new Col("Fornecedor", 240, Expande: true), new Col("Documento", 120),
-                            new Col("Total", 120, true), new Col("Situação", 100));
+                            new Col("Total", 120, true), new Col("Situação", 110));
         var fechar = K.Botao("Fechar", Close);
         var rodape = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
         DockPanel.SetDock(fechar, Dock.Right); rodape.Children.Add(fechar);

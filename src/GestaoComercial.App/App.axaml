@@ -5,29 +5,70 @@
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Light" Accent="#4F46E5" RegionColor="#F5F6FA" ErrorText="#DC2626" />
+        <ColorPaletteResources x:Key="Light" Accent="#4F46E5" RegionColor="#F5F6F8" ErrorText="#DC2626" />
       </FluentTheme.Palettes>
     </FluentTheme>
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
 
-    <!-- ===== Botões ===== -->
-    <Style Selector="Button">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="14,8" />
-      <Setter Property="MinHeight" Value="38" />
+    <!-- ===================================================================== textos -->
+    <Style Selector="TextBlock.sub">
+      <Setter Property="Foreground" Value="#64748B" />
+      <Setter Property="FontSize" Value="13.5" />
+    </Style>
+    <Style Selector="TextBlock.h1">
+      <Setter Property="FontSize" Value="25" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#0F172A" />
+      <Setter Property="LetterSpacing" Value="-0.4" />
+    </Style>
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontSize" Value="15.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#0F172A" />
+    </Style>
+    <Style Selector="TextBlock.rotulo">
+      <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="#475569" />
+    </Style>
+    <Style Selector="TextBlock.kpi">
+      <Setter Property="FontSize" Value="26" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#0F172A" />
+    </Style>
+
+    <!-- ===================================================================== botões -->
+    <Style Selector="Button">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="FontSize" Value="13.5" />
       <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#D5DAE5" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Foreground" Value="#1F2937" />
+      <Setter Property="Foreground" Value="#1E293B" />
       <Setter Property="Cursor" Value="Hand" />
     </Style>
+    <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 1 2 0 #0D0F172A" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter>
+    </Style>
     <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#F3F4F8" />
-      <Setter Property="BorderBrush" Value="#C3CAD9" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
+      <Setter Property="TextElement.Foreground" Value="#0F172A" />
     </Style>
     <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#E8EBF2" />
+      <Setter Property="Background" Value="#F1F5F9" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="RenderTransform" Value="scale(0.98)" />
     </Style>
 
     <Style Selector="Button.primario">
@@ -35,6 +76,9 @@
       <Setter Property="BorderBrush" Value="#4F46E5" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.primario /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 1 2 0 #334F46E5, 0 4 12 -2 #554F46E5" />
     </Style>
     <Style Selector="Button.primario:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#4338CA" />
@@ -46,124 +90,228 @@
       <Setter Property="TextElement.Foreground" Value="White" />
     </Style>
     <Style Selector="Button.primario:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#C7C9F4" />
-      <Setter Property="BorderBrush" Value="#C7C9F4" />
+      <Setter Property="Background" Value="#C7D2FE" />
+      <Setter Property="BorderBrush" Value="#C7D2FE" />
+      <Setter Property="TextElement.Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.verde">
+      <Setter Property="Background" Value="#059669" />
+      <Setter Property="BorderBrush" Value="#059669" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.verde /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 1 2 0 #33059669, 0 6 16 -4 #66059669" />
+    </Style>
+    <Style Selector="Button.verde:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#047857" />
+      <Setter Property="BorderBrush" Value="#047857" />
+      <Setter Property="TextElement.Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.verde:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#065F46" />
       <Setter Property="TextElement.Foreground" Value="White" />
     </Style>
 
     <Style Selector="Button.perigo">
-      <Setter Property="Foreground" Value="#B91C1C" />
-      <Setter Property="BorderBrush" Value="#FCA5A5" />
+      <Setter Property="Foreground" Value="#DC2626" />
+      <Setter Property="BorderBrush" Value="#FECACA" />
     </Style>
     <Style Selector="Button.perigo:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#FEF2F2" />
-      <Setter Property="BorderBrush" Value="#F87171" />
-      <Setter Property="TextElement.Foreground" Value="#991B1B" />
+      <Setter Property="BorderBrush" Value="#FCA5A5" />
+      <Setter Property="TextElement.Foreground" Value="#B91C1C" />
     </Style>
 
-    <Style Selector="Button.verde">
-      <Setter Property="Background" Value="#16A34A" />
-      <Setter Property="BorderBrush" Value="#16A34A" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+    <!-- botão discreto, sem borda (ações das listas) -->
+    <Style Selector="Button.fantasma">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="#475569" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="MinHeight" Value="36" />
     </Style>
-    <Style Selector="Button.verde:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#15803D" />
-      <Setter Property="BorderBrush" Value="#15803D" />
-      <Setter Property="TextElement.Foreground" Value="White" />
+    <Style Selector="Button.fantasma /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+    <Style Selector="Button.fantasma:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#F1F5F9" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="TextElement.Foreground" Value="#0F172A" />
+    </Style>
+    <Style Selector="Button.fantasma.perigo">
+      <Setter Property="Foreground" Value="#DC2626" />
+    </Style>
+    <Style Selector="Button.fantasma.perigo:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#FEF2F2" />
+      <Setter Property="TextElement.Foreground" Value="#B91C1C" />
     </Style>
 
     <Style Selector="Button.chip">
-      <Setter Property="CornerRadius" Value="18" />
-      <Setter Property="Padding" Value="12,5" />
-      <Setter Property="MinHeight" Value="32" />
-      <Setter Property="Background" Value="#EEF2FF" />
-      <Setter Property="BorderBrush" Value="#C7D2FE" />
-      <Setter Property="Foreground" Value="#3730A3" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.chip /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="none" />
     </Style>
     <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#E0E7FF" />
+      <Setter Property="Background" Value="#EEF2FF" />
+      <Setter Property="BorderBrush" Value="#C7D2FE" />
+      <Setter Property="TextElement.Foreground" Value="#3730A3" />
+    </Style>
+    <Style Selector="Button.chip.ativo /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#EEF2FF" />
       <Setter Property="BorderBrush" Value="#A5B4FC" />
-      <Setter Property="TextElement.Foreground" Value="#312E81" />
+      <Setter Property="TextElement.Foreground" Value="#3730A3" />
     </Style>
 
-    <!-- Menu lateral -->
+    <!-- blocos clicáveis (atalhos do painel, formas de pagamento, produtos mais vendidos) -->
+    <Style Selector="Button.bloco">
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#E7E9EF" />
+    </Style>
+    <Style Selector="Button.bloco /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+    <Style Selector="Button.bloco:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#F8F9FF" />
+      <Setter Property="BorderBrush" Value="#A5B4FC" />
+    </Style>
+    <Style Selector="Button.bloco.ativo /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#EEF2FF" />
+      <Setter Property="BorderBrush" Value="#6366F1" />
+      <Setter Property="BorderThickness" Value="1.5" />
+    </Style>
+
+    <!-- linhas da lista de sugestões de produto -->
+    <Style Selector="Button.sugestao /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+    <Style Selector="Button.sugestao:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#F5F7FF" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.sugestao:pressed">
+      <Setter Property="RenderTransform" Value="none" />
+    </Style>
+
+    <!-- ===================================================================== menu lateral -->
     <Style Selector="Button.nav">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Foreground" Value="#C7D2FE" />
+      <Setter Property="Foreground" Value="#334155" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
-      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="MinHeight" Value="38" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="none" />
     </Style>
     <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2B2870" />
+      <Setter Property="Background" Value="#F1F5F9" />
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="TextElement.Foreground" Value="White" />
+      <Setter Property="TextElement.Foreground" Value="#0F172A" />
+    </Style>
+    <Style Selector="Button.nav.ativo">
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.nav.ativo /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#4F46E5" />
+      <Setter Property="Background" Value="#EEF2FF" />
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="TextElement.Foreground" Value="White" />
+      <Setter Property="TextElement.Foreground" Value="#4338CA" />
+    </Style>
+    <Style Selector="Button.nav:pressed">
+      <Setter Property="RenderTransform" Value="none" />
     </Style>
 
-    <!-- ===== Campos ===== -->
+    <!-- ===================================================================== campos -->
     <Style Selector="TextBox">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="MinHeight" Value="38" />
-      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="FontSize" Value="14" />
       <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#D5DAE5" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#0F172A" />
     </Style>
-    <Style Selector="AutoCompleteBox">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="MinHeight" Value="38" />
-      <Setter Property="Padding" Value="10,8" />
+    <Style Selector="TextBox /template/ TextBlock#PART_Watermark, TextBox /template/ TextBlock#PART_FloatingWatermark">
+      <Setter Property="Foreground" Value="#94A3B8" />
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
       <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#D5DAE5" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#6366F1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BoxShadow" Value="0 0 0 3 #2E6366F1" />
+    </Style>
+    <Style Selector="TextBox:error /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#F87171" />
+    </Style>
+    <Style Selector="TextBox.grande">
+      <Setter Property="MinHeight" Value="50" />
+      <Setter Property="FontSize" Value="15.5" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
+
+    <Style Selector="AutoCompleteBox">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
+
     <Style Selector="ComboBox">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="FontSize" Value="14" />
       <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#D5DAE5" />
-      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
+    <Style Selector="ComboBox:pointerover /template/ Border#Background">
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
+    </Style>
+    <Style Selector="ComboBox:focus-within /template/ Border#Background">
+      <Setter Property="BorderBrush" Value="#6366F1" />
     </Style>
 
-    <!-- ===== Cartões e textos ===== -->
+    <Style Selector="CheckBox">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+
+    <!-- ===================================================================== cartões -->
     <Style Selector=":is(Border).cartao">
       <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#E6E9F0" />
+      <Setter Property="BorderBrush" Value="#E7E9EF" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="12" />
-      <Setter Property="Padding" Value="16" />
-      <Setter Property="BoxShadow" Value="0 1 3 0 #12000000" />
-    </Style>
-    <Style Selector="TextBlock.sub">
-      <Setter Property="Foreground" Value="#6B7280" />
-    </Style>
-    <Style Selector="TextBlock.h1">
-      <Setter Property="FontSize" Value="26" />
-      <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="#111827" />
-    </Style>
-    <Style Selector="TextBlock.h2">
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#111827" />
-    </Style>
-    <Style Selector="TextBlock.rotulo">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#6B7280" />
-    </Style>
-    <Style Selector="TextBlock.kpi">
-      <Setter Property="FontSize" Value="24" />
-      <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="#111827" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="20" />
+      <Setter Property="BoxShadow" Value="0 1 2 0 #0A0F172A, 0 2 8 -2 #0A0F172A" />
     </Style>
 
     <Style Selector="TabItem">
@@ -174,24 +322,59 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
-    <!-- ===== Tabelas ===== -->
+    <Style Selector="ToolTip">
+      <Setter Property="Background" Value="#0F172A" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+
+    <!-- ===================================================================== tabelas -->
+    <Style Selector="DataGrid">
+      <Setter Property="Foreground" Value="#1E293B" />
+    </Style>
     <Style Selector="DataGridColumnHeader">
-      <Setter Property="Padding" Value="12,0,0,0" />
+      <Setter Property="Padding" Value="16,0,0,0" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="#6B7280" />
-      <Setter Property="Background" Value="#F9FAFB" />
+      <Setter Property="Foreground" Value="#64748B" />
+      <Setter Property="Background" Value="#F8FAFC" />
       <Setter Property="SeparatorBrush" Value="Transparent" />
+      <Setter Property="AreSeparatorsVisible" Value="False" />
     </Style>
     <Style Selector="DataGridColumnHeader /template/ Path#SortIcon">
       <Setter Property="IsVisible" Value="False" />
     </Style>
+    <Style Selector="DataGrid /template/ Rectangle#PART_ColumnHeadersAndRowsSeparator">
+      <Setter Property="Fill" Value="#EEF0F4" />
+    </Style>
+    <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+      <Setter Property="Fill" Value="#F8F9FF" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
     <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+      <Setter Property="Fill" Value="#EEF2FF" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="DataGridRow:selected:pointerover /template/ Rectangle#BackgroundRectangle">
       <Setter Property="Fill" Value="#E0E7FF" />
       <Setter Property="Opacity" Value="1" />
     </Style>
-    <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
-      <Setter Property="Fill" Value="#F3F4FF" />
+    <Style Selector="DataGridCell /template/ Grid#FocusVisual">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DataGridCell /template/ Rectangle#CurrencyVisual">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DataGridColumnHeader /template/ Grid#FocusVisual">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- ===================================================================== rolagem mais fina -->
+    <Style Selector="ScrollBar">
+      <Setter Property="AllowAutoHide" Value="True" />
     </Style>
   </Application.Styles>
 </Application>

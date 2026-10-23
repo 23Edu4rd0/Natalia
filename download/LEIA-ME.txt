@@ -1,4 +1,4 @@
-GESTÃO COMERCIAL 2.3.0
+GESTÃO COMERCIAL 2.4.0
 
 WINDOWS
 1. Baixe GestaoComercial-Windows.zip

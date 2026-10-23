@@ -143,6 +143,7 @@ public class JanelaBase : Window
     public JanelaBase()
     {
         FontSize = 14;
+        Foreground = Cores.P(Cores.Corpo);
         Background = Cores.P(Cores.Fundo);
         Abertas.Add(this);
         Closed += (_, _) => Abertas.Remove(this);
@@ -179,33 +180,34 @@ sealed class CaixaMensagem : JanelaBase
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Closed += (_, _) => fim.TrySetResult();
 
-        var (cor, letra) = nivel switch { Nivel.Erro => ("#C62828", "×"), Nivel.Aviso => ("#E08A00", "!"), _ => ("#1F5FA8", "i") };
-        var icone = new Border
-        {
-            Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(Color.Parse(cor)),
-            VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 14, 0),
-            Child = new TextBlock { Text = letra, Foreground = Brushes.White, FontSize = 20, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-        };
-        var msg = new SelectableTextBlock { Text = texto, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MaxWidth = 440, MinWidth = 280, VerticalAlignment = VerticalAlignment.Center };
+        Background = Brushes.White;
+        var (cor, fundo, nomeIcone) = pergunta ? ("#4F46E5", "#EEF2FF", "info")
+            : nivel switch { Nivel.Erro => ("#DC2626", "#FEF2F2", "fechar"), Nivel.Aviso => ("#D97706", "#FFFBEB", "alerta"), _ => ("#059669", "#ECFDF5", "ok") };
+        var icone = K.Bolha(nomeIcone, cor, fundo, 44);
+        icone.VerticalAlignment = VerticalAlignment.Top; icone.Margin = new Thickness(0, 0, 16, 0);
+        var tit = new TextBlock { Text = titulo, FontSize = 16.5, FontWeight = FontWeight.SemiBold, Foreground = Cores.P(Cores.Texto), Margin = new Thickness(0, 0, 0, 6) };
+        var msg = new SelectableTextBlock { Text = texto, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MaxWidth = 440, MinWidth = 300, FontSize = 14, LineHeight = 21, Foreground = Cores.P(Cores.Cinza) };
 
-        var botoes = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+        var botoes = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
         Button Mk(string t, bool val, bool primario)
         {
-            var b = new Button { Content = t, MinWidth = 84, HorizontalContentAlignment = HorizontalAlignment.Center };
+            var b = new Button { Content = t, MinWidth = 96, HorizontalContentAlignment = HorizontalAlignment.Center };
             if (primario) b.Classes.Add("primario");
             b.Click += (_, _) => { resultado = val; Close(); };
             return b;
         }
         Button principal;
-        if (pergunta) { principal = Mk("Sim", true, true); botoes.Children.Add(principal); botoes.Children.Add(Mk("Não", false, false)); }
+        if (pergunta) { principal = Mk("Sim", true, true); botoes.Children.Add(Mk("Não", false, false)); botoes.Children.Add(principal); }
         else { principal = Mk("OK", true, true); botoes.Children.Add(principal); }
 
-        var corpo = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Margin = new Thickness(22) };
+        var corpo = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Margin = new Thickness(26, 24, 30, 24) };
         corpo.Children.Add(icone);
         var direita = new StackPanel(); Grid.SetColumn(direita, 1);
-        direita.Children.Add(msg); direita.Children.Add(botoes);
+        direita.Children.Add(tit); direita.Children.Add(msg);
         corpo.Children.Add(direita);
-        Content = corpo;
+        var rodape = new Border { Child = botoes, Padding = new Thickness(24, 14), Background = Cores.P("#F8FAFC"), BorderBrush = Cores.P(Cores.Linha), BorderThickness = new Thickness(0, 1, 0, 0) };
+        var doca = new DockPanel(); DockPanel.SetDock(rodape, Dock.Bottom); doca.Children.Add(rodape); doca.Children.Add(corpo);
+        Content = doca;
 
         KeyDown += (_, e) =>
         {
@@ -238,20 +240,28 @@ sealed class CaixaPergunta : JanelaBase
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Closed += (_, _) => fim.TrySetResult();
-        var caixa = new TextBox { Text = inicial, MinWidth = 380 };
+        Background = Brushes.White;
+        var caixa = new TextBox { Text = inicial, MinWidth = 400 };
         void Ok() { resposta = caixa.Text ?? ""; Close(); }
-        var ok = new Button { Content = "OK", MinWidth = 84 }; ok.Classes.Add("primario"); ok.Click += (_, _) => Ok();
-        var cancelar = new Button { Content = "Cancelar", MinWidth = 84 }; cancelar.Click += (_, _) => Close();
-        Content = new StackPanel
+        var ok = new Button { Content = "OK", MinWidth = 96 }; ok.Classes.Add("primario"); ok.Click += (_, _) => Ok();
+        var cancelar = new Button { Content = "Cancelar", MinWidth = 96 }; cancelar.Click += (_, _) => Close();
+        var corpo = new StackPanel
         {
-            Margin = new Thickness(22), Spacing = 12,
+            Margin = new Thickness(26, 22, 26, 22), Spacing = 12,
             Children =
             {
-                new TextBlock { Text = texto, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MaxWidth = 440 },
+                new TextBlock { Text = titulo, FontSize = 16.5, FontWeight = FontWeight.SemiBold, Foreground = Cores.P(Cores.Texto) },
+                new TextBlock { Text = texto, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MaxWidth = 440, Foreground = Cores.P(Cores.Cinza) },
                 caixa,
-                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { ok, cancelar } },
             },
         };
+        var rodape = new Border
+        {
+            Padding = new Thickness(24, 14), Background = Cores.P("#F8FAFC"), BorderBrush = Cores.P(Cores.Linha), BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right, Children = { cancelar, ok } },
+        };
+        var doca = new DockPanel(); DockPanel.SetDock(rodape, Dock.Bottom); doca.Children.Add(rodape); doca.Children.Add(corpo);
+        Content = doca;
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); else if (e.Key == Key.Enter) Ok(); };
         Opened += (_, _) => { caixa.Focus(); caixa.SelectAll(); };
     }

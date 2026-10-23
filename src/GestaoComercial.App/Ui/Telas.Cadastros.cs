@@ -25,6 +25,7 @@ public abstract class CadastroTela<T> : Tela where T : class
     protected virtual string MensagemVazia => $"Nenhum {Singular} cadastrado ainda.\nClique em “Novo {Singular}” para começar.";
     protected virtual void MontarFiltros(StackPanel barra) { }
     protected virtual void MontarAcoes(StackPanel barra) { }
+    protected virtual string IconeVazio => "vazio";
 
     public TextBox Busca { get; }
     public CheckBox Inativos { get; }
@@ -38,24 +39,24 @@ public abstract class CadastroTela<T> : Tela where T : class
 
     protected CadastroTela(MainWindow app) : base(app)
     {
-        Busca = K.Caixa("", 300, "Buscar…");
-        Busca.InnerLeftContent = K.Margem(Icones.Criar("busca", 18, "#9CA3AF"), 10, 0, 0, 0);
+        Busca = K.CaixaBusca($"Buscar {Plural}…", 320);
         Inativos = new CheckBox { Content = "Mostrar inativos", VerticalAlignment = VerticalAlignment.Center };
         var filtros = K.Linha(14, Busca, Inativos);
         MontarFiltros(filtros);
 
         novo = K.Botao($"Novo {Singular}", SeguroAsync(NovoAsync), icone: "mais", classe: "primario");
-        var direita = K.Linha(K.Botao("Editar", SeguroAsync(EditarAsync), icone: "editar"), K.Botao("Excluir", SeguroAsync(ExcluirAsync), icone: "lixeira", classe: "perigo"));
+        var direita = K.Linha(K.Botao("Editar", SeguroAsync(EditarAsync), icone: "editar", classe: "fantasma"),
+                              K.Botao("Excluir", SeguroAsync(ExcluirAsync), icone: "lixeira", classe: "fantasma perigo"));
         MontarAcoes(direita);
-        direita.Children.Add(K.Botao("Exportar CSV", SeguroAsync(ExportarAsync), icone: "exportar"));
+        direita.Children.Add(K.Botao("Exportar", SeguroAsync(ExportarAsync), icone: "exportar", classe: "fantasma"));
         // os botões quebram de linha quando a janela é estreita (em vez de sair da tela)
-        var botoes = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var bt in direita.Children.ToList()) { direita.Children.Remove(bt); bt.Margin = new Thickness(0, 0, 8, 8); botoes.Children.Add(bt); }
-        var acoes = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 10), Children = { K.Margem(filtros, 0, 0, 0, 8), botoes } };
+        var itensBarra = direita.Children.ToArray();
+        direita.Children.Clear();
+        var botoes = K.Fila(6, itensBarra);
 
         Tabela = new Tabela(Colunas);
-        total.Margin = new Thickness(0, 10, 0, 0);
-        Content = K.Doca(acoes, Tabela.ComVazio(MensagemVazia), total);
+        total.FontSize = 12.5;
+        Content = K.Lista(Tabela, K.Ferramentas(filtros, botoes), total, MensagemVazia, IconeVazio);
 
         K.AoMudarTexto(Busca, K.Debounce(Seguro(Atualizar)));
         Inativos.IsCheckedChanged += (_, _) => Seguro(Atualizar)();
@@ -65,7 +66,7 @@ public abstract class CadastroTela<T> : Tela where T : class
     public override void Atualizar()
     {
         var dados = Listar();
-        Tabela.TextoVazio = (Busca.Text ?? "").Trim().Length > 0 ? $"Nada encontrado para “{Busca.Text!.Trim()}”." : MensagemVazia;
+        Tabela.TextoVazio = (Busca.Text ?? "").Trim().Length > 0 ? $"Nada encontrado para “{Busca.Text!.Trim()}”.\nConfira a escrita ou busque por outra parte do nome." : MensagemVazia;
         Tabela.Definir(dados.Select(ParaLinha));
         total.Text = $"{dados.Count} {(dados.Count == 1 ? Singular : Plural)}";
     }
@@ -154,7 +155,8 @@ public sealed class ClientesTela : PessoasTela
     public ClientesTela(MainWindow app) : base(app) { }
     protected override string Descricao => "Quem compra de você. Abra o histórico para ver as compras e o fiado de cada um.";
     protected override void MontarAcoes(StackPanel barra) =>
-        barra.Children.Insert(0, K.Botao("Histórico / fiado", SeguroAsync(HistoricoAsync), icone: "ver"));
+        barra.Children.Insert(0, K.Botao("Histórico / fiado", SeguroAsync(HistoricoAsync), icone: "ver", classe: "fantasma"));
+    protected override string IconeVazio => "clientes";
 
     public Task HistoricoAsync() => HistoricoClienteDialog.Abrir(Janela, Svc, Exigir(Tabela.IdLong, "um cliente"), AtualizarTudo);
     protected override TipoPessoa Tipo => TipoPessoa.Cliente;
@@ -166,6 +168,7 @@ public sealed class FornecedoresTela : PessoasTela
 {
     public FornecedoresTela(MainWindow app) : base(app) { }
     protected override string Descricao => "De quem você compra as mercadorias.";
+    protected override string IconeVazio => "fornecedores";
     protected override TipoPessoa Tipo => TipoPessoa.Fornecedor;
     protected override string Singular => "fornecedor";
     protected override string Plural => "fornecedores";
@@ -182,13 +185,14 @@ public sealed class ProdutosTela : CadastroTela<Produto>
         ? "O que você vende: preços, tipos e estoque mínimo. Linhas em vermelho precisam de reposição."
         : "O que você vende e quanto tem de cada um. Linhas em vermelho: acabando ou zerado.";
     protected override string MensagemVazia => "Nenhum produto cadastrado ainda.\nClique em “Novo produto” ou use “Importar planilha” para trazer sua lista do Excel.";
+    protected override string IconeVazio => "produtos";
 
     protected override string Singular => "produto";
     protected override string Plural => "produtos";
     protected override Col[] Colunas => App.Avancado
         ? new[]
         {
-            new Col("Código", 100), new Col("Produto", 260, Expande: true), new Col("Tipo", 140), new Col("Un.", 60), new Col("Custo", 100, true),
+            new Col("Código", 100), new Col("Produto", 260, Expande: true), new Col("Tipo", 140), new Col("Un.", 72), new Col("Custo", 100, true),
             new Col("Venda", 100, true), new Col("Estoque", 105, true), new Col("Mín.", 80, true), new Col("Situação", 110, Chip: true),
         }
         : new[] { new Col("Produto", 260, Expande: true), new Col("Tipo", 150), new Col("Preço", 110, true), new Col("Estoque", 105, true), new Col("Situação", 110, Chip: true) };
@@ -202,15 +206,15 @@ public sealed class ProdutosTela : CadastroTela<Produto>
 
     protected override void MontarAcoes(StackPanel barra)
     {
-        barra.Children.Insert(0, K.Botao("Importar planilha…", SeguroAsync(ImportarAsync), icone: "exportar"));
-        barra.Children.Insert(1, K.Botao("Tipos…", SeguroAsync(GerenciarTiposAsync), icone: "produtos"));
-        if (App.Avancado) barra.Children.Insert(2, K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "relatorios"));
-        else
+        if (!App.Avancado)
         {
             // no modo simples o estoque se mexe aqui mesmo (não há páginas de Estoque e Entrada)
-            barra.Children.Insert(2, K.Botao("Chegou mercadoria", SeguroAsync(() => ChegouMercadoriaAsync()), icone: "entrada", classe: "primario"));
-            barra.Children.Insert(3, K.Botao("Corrigir estoque", SeguroAsync(CorrigirEstoqueAsync), icone: "editar"));
+            barra.Children.Insert(0, K.Botao("Chegou mercadoria", SeguroAsync(() => ChegouMercadoriaAsync()), icone: "entrada"));
+            barra.Children.Insert(1, K.Botao("Corrigir estoque", SeguroAsync(CorrigirEstoqueAsync), icone: "ajustes", classe: "fantasma"));
         }
+        barra.Children.Add(K.Botao("Tipos…", SeguroAsync(GerenciarTiposAsync), icone: "etiqueta", classe: "fantasma"));
+        if (App.Avancado) barra.Children.Add(K.Botao("Reajustar preços…", SeguroAsync(ReajustarAsync), icone: "subindo", classe: "fantasma"));
+        barra.Children.Add(K.Botao("Importar planilha…", SeguroAsync(ImportarAsync), icone: "nuvem", classe: "fantasma"));
     }
 
     /// <summary>Modo simples: soma ao estoque o que chegou, sem fornecedor nem nota de entrada.</summary>

@@ -56,6 +56,9 @@ public record ResumoVendas(long Qtd, long Total, long Descontos, long Custo, lon
     public long TicketMedio => Qtd > 0 ? Total / Qtd : 0;
 }
 
+/// <summary>Vendas concluídas de um dia (Data em aaaa-mm-dd).</summary>
+public record VendaDia(string Data, long Qtd, long Total);
+
 public record MaisVendido(string Codigo, string Descricao, long Quantidade, long Receita);
 public record PorPagamento(string Forma, long Qtd, long Total);
 public record ResumoCategoria(string Categoria, long Produtos, long Unidades, long ValorCusto, long ValorVenda, long Baixos);

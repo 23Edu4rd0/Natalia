@@ -88,7 +88,7 @@ public sealed class Ambiente : IDisposable
         await tarefa;
     }
 
-    public void Foto(string nome, Window? janela = null)
+    public void Foto(string nome, TopLevel? janela = null)
     {
         var pasta = Environment.GetEnvironmentVariable("GC_SHOT_DIR");
         if (string.IsNullOrEmpty(pasta)) return;

@@ -53,7 +53,7 @@ public sealed class FormDialog : JanelaBase
 
     public bool Salvo => salvo;
     Action<FormDialog, string>? aoMudarCampo;
-    readonly TextBlock lblErro = new() { Foreground = Cores.P(Cores.Vermelho), TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13, IsVisible = false, Margin = new Thickness(0, 10, 0, 0) };
+    readonly TextBlock lblErro = new() { Foreground = Cores.P("#B91C1C"), TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13, IsVisible = false };
     /// <summary>Último erro de preenchimento mostrado dentro da janela (vazio se não há).</summary>
     public string Erro => lblErro.IsVisible ? lblErro.Text ?? "" : "";
 
@@ -78,22 +78,30 @@ public sealed class FormDialog : JanelaBase
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-        var grade = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,360"), Margin = new Thickness(22, 18, 22, 8) };
-        int linha = 0; Control? primeiro = null;
+        Background = Avalonia.Media.Brushes.White;
+        // muitos campos: duas colunas (o formulário não fica comprido demais e nada some lá embaixo)
+        var duasColunas = campos.Count(c => c.Tipo is not (TipoCampo.Bool or TipoCampo.Multilinha)) > 5;
+        var grade = new Grid { Width = duasColunas ? 620 : 420, ColumnDefinitions = duasColunas ? new ColumnDefinitions("*,20,*") : new ColumnDefinitions("*") };
+        var corpo = new StackPanel { Spacing = 14, Margin = new Thickness(28, 6, 28, 8) };
+        int linhaGrade = 0, colunaGrade = 0;
+        void Colocar(Control bloco, bool inteiro)
+        {
+            if (inteiro && colunaGrade != 0) { linhaGrade++; colunaGrade = 0; }
+            while (grade.RowDefinitions.Count <= linhaGrade) grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            bloco.Margin = new Thickness(0, 0, 0, 16);
+            K.ColocarNaGrade(grade, bloco, linhaGrade, colunaGrade, inteiro && duasColunas ? 3 : 1);
+            if (!duasColunas || inteiro || colunaGrade == 2) { linhaGrade++; colunaGrade = 0; } else colunaGrade = 2;
+        }
+        Control? primeiro = null;
+        // rótulo em cima do campo, dica embaixo (quebra linha em vez de ser cortada)
         foreach (var c in campos)
         {
-            grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            var rot = K.Rotulo(c.Rotulo + (c.Obrigatorio ? " *" : ""));
-            rot.VerticalAlignment = c.Tipo == TipoCampo.Multilinha ? VerticalAlignment.Top : VerticalAlignment.Center;
-            rot.Margin = new Thickness(0, c.Tipo == TipoCampo.Multilinha ? 8 : 0, 14, 0);
-            K.ColocarNaGrade(grade, rot, linha, 0);
-
             iniciais.TryGetValue(c.Chave, out var v);
             Control w;
             switch (c.Tipo)
             {
                 case TipoCampo.Bool:
-                    w = new CheckBox { IsChecked = v is null || v is true, IsEnabled = !c.SomenteLeitura };
+                    w = new CheckBox { IsChecked = v is null || v is true, IsEnabled = !c.SomenteLeitura, Content = c.Rotulo };
                     break;
                 case TipoCampo.Escolha:
                     var combo = new ComboBox { ItemsSource = c.Opcoes.Select(o => o.Rotulo).ToList(), HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -102,41 +110,52 @@ public sealed class FormDialog : JanelaBase
                     w = combo;
                     break;
                 case TipoCampo.Multilinha:
-                    w = new TextBox { Text = v as string ?? "", AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Height = 72 };
+                    w = new TextBox { Text = v as string ?? "", AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Height = 80, VerticalContentAlignment = VerticalAlignment.Top };
                     break;
                 default:
                     var txt = c.Tipo == TipoCampo.Dinheiro
                         ? (v is long cent ? Util.FmtDinheiro(cent, false) : "")
                         : v switch { null => "", long n => n.ToString(), _ => v.ToString() ?? "" };
-                    w = new TextBox { Text = txt, IsReadOnly = c.SomenteLeitura };
-                    if (c.SomenteLeitura) { ((TextBox)w).IsReadOnly = true; w.Focusable = false; w.Opacity = 0.7; }
+                    var tb = new TextBox { Text = txt, IsReadOnly = c.SomenteLeitura, VerticalContentAlignment = VerticalAlignment.Center };
+                    if (c.Tipo == TipoCampo.Dinheiro) tb.InnerLeftContent = new TextBlock { Text = "R$", Foreground = Cores.P(Cores.Texto3), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+                    if (c.SomenteLeitura) { tb.Focusable = false; tb.Background = Cores.P("#F8FAFC"); tb.Foreground = Cores.P(Cores.Texto2); }
+                    w = tb;
                     break;
             }
-            w.Margin = new Thickness(0, 4);
             controles[c.Chave] = w;
             if (primeiro == null && !c.SomenteLeitura && c.Tipo != TipoCampo.Bool) primeiro = w;
-            K.ColocarNaGrade(grade, w, linha, 1);
-            linha++;
+            var bloco = new StackPanel { Spacing = 6 };
+            if (c.Tipo != TipoCampo.Bool) bloco.Children.Add(K.Etiqueta(c.Rotulo + (c.Obrigatorio ? " *" : "")));
+            bloco.Children.Add(w);
             if (c.Dica.Length > 0)
             {
-                grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-                var dica = K.Discreto(c.Dica); dica.FontSize = 11; dica.Margin = new Thickness(0, 0, 0, 4);
-                K.ColocarNaGrade(grade, dica, linha, 1);
-                linha++;
+                var dica = K.Discreto(c.Dica); dica.FontSize = 12; dica.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
+                bloco.Children.Add(dica);
             }
+            Colocar(bloco, c.Tipo is TipoCampo.Bool or TipoCampo.Multilinha);
         }
+        var caixaErro = new Border
+        {
+            Background = Cores.P("#FEF2F2"), BorderBrush = Cores.P("#FECACA"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 9),
+            Child = lblErro,
+        };
+        lblErro.Margin = new Thickness(0);
+        caixaErro.Bind(IsVisibleProperty, lblErro.GetObservable(IsVisibleProperty));
+        corpo.Children.Add(caixaErro);   // em cima, logo abaixo do título: o erro sempre fica à vista
+        corpo.Children.Add(grade);
 
-        var salvar = new Button { Content = textoBotao, MinWidth = 96 }; salvar.Classes.Add("primario");
+        var salvar = new Button { Content = textoBotao, MinWidth = 110 }; salvar.Classes.Add("primario");
         salvar.Click += (_, _) => Salvar();
         var cancelar = new Button { Content = "Cancelar", MinWidth = 96 };
         cancelar.Click += (_, _) => Close();
-        var barra = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-        barra.Children.Add(salvar); barra.Children.Add(cancelar);
-        grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        K.ColocarNaGrade(grade, lblErro, linha, 0, 2);
-        linha++;
-        grade.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        K.ColocarNaGrade(grade, barra, linha, 0, 2);
+        var barra = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
+        barra.Children.Add(cancelar); barra.Children.Add(salvar);
+        var rodape = new Border { Child = barra, Padding = new Thickness(28, 14), Background = Cores.P("#F8FAFC"), BorderBrush = Cores.P(Cores.Linha), BorderThickness = new Thickness(0, 1, 0, 0) };
+        var cabecalho = new TextBlock { Text = titulo, FontSize = 18, FontWeight = Avalonia.Media.FontWeight.SemiBold, Foreground = Cores.P(Cores.Texto), Margin = new Thickness(28, 22, 28, 10) };
+        var doca = new DockPanel();
+        DockPanel.SetDock(cabecalho, Dock.Top); DockPanel.SetDock(rodape, Dock.Bottom);
+        doca.Children.Add(cabecalho); doca.Children.Add(rodape);
+        doca.Children.Add(new ScrollViewer { Content = corpo, MaxHeight = 620, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
         // ao digitar: some o erro anterior e avisa quem quiser reagir (ex.: calcular preço pela margem)
         foreach (var (chave, ctl) in controles)
             if (ctl is TextBox tb)
@@ -144,7 +163,7 @@ public sealed class FormDialog : JanelaBase
                 var k = chave;
                 tb.PropertyChanged += (_, e) => { if (e.Property == TextBox.TextProperty) { lblErro.IsVisible = false; aoMudarCampo?.Invoke(this, k); } };
             }
-        Content = grade;
+        Content = doca;
 
         KeyDown += (_, e) =>
         {

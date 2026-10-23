@@ -31,6 +31,12 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 ## O que ele faz
 
+**Novidades da 2.4 (visual novo)**
+- **Visual redesenhado**: menu lateral claro com o nome da loja, cartões com números grandes, listas com busca e ações no mesmo cartão, campos com destaque ao digitar, formulários e mensagens mais limpos. Funciona bem em tela grande (1920) e em notebook.
+- **Sugestões enquanto digita o produto** (na venda e na entrada): aparece a lista com nome, código, preço e estoque; setas ↑ ↓ e Enter adicionam, sem precisar saber o código. Não liga para acentos ("calca" acha "Calça").
+- **Venda mais rápida**: formas de pagamento em blocos de um clique, total e botão **Finalizar (F9)** sempre visíveis, mais vendidos em blocos.
+- **Painel** com gráfico das vendas dos últimos 14 dias e atalhos; **Relatórios** com cartões (faturamento, lucro, ticket médio) e barras por forma de pagamento; **Configurações** em duas colunas.
+
 **Modo simples e modo avançado** (Configurações → *Modo de uso*; o programa abre no **simples**)
 - **Simples** (padrão): menu com só *Painel, Nova venda, Vendas, A receber, Clientes, Produtos e Configurações*. Cadastro de produto com nome, tipo, preço e quantidade. Na venda, desconto/troco/observação ficam atrás de um botão. O estoque se mexe na lista de produtos (*Chegou mercadoria* e *Corrigir estoque*), sem fornecedor.
 - **Avançado**: tudo — Caixa, Fornecedores, Estoque por tipo, Entrada de mercadorias, Relatórios, custo/margem/código/estoque mínimo, reajuste de preços e lucro no painel.
@@ -75,5 +81,5 @@ Dentro: `gestao.db`, `backups/`, `notas/`, `exportacoes/` e `logs/gestao.log`.
 ```
 src/GestaoComercial.Core   regras de negócio e SQLite (sem interface)
 src/GestaoComercial.App    telas (Avalonia)
-tests/GestaoComercial.Tests  167 testes: regras + interface renderizada em memória   →   dotnet test
+tests/GestaoComercial.Tests  177 testes: regras + interface renderizada em memória   →   dotnet test
 ```
