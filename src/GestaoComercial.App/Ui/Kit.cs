@@ -65,6 +65,7 @@ public static class Icones
         ["calendario"] = "M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z",
         ["etiqueta"] = "M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z",
         ["mais-horiz"] = "M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
+        ["nf"] = "M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v14H3v3c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V2l-1.5 1.5zM19 19c0 .55-.45 1-1 1s-1-.45-1-1v-3H8V5h11v14zM9 7h6v2H9zm7 0h2v2h-2zm-7 3h6v2H9zm7 0h2v2h-2z",
         ["sacola"] = "M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z",
     };
 
@@ -135,8 +136,8 @@ public sealed class Tabela : DataGrid
 
     static (string Fundo, string Texto) CorChip(string t) => t switch
     {
-        "Concluída" or "Ativo" or "Ativa" or "Entrada (troco)" or "Em dia" => (Cores.VerdeFundo, "#065F46"),
-        "Cancelada" or "Inativo" or "Estornado" or "Retirada" => (Cores.VermelhoFundo, "#991B1B"),
+        "Concluída" or "Ativo" or "Ativa" or "Entrada (troco)" or "Em dia" or "Autorizada" => (Cores.VerdeFundo, "#065F46"),
+        "Cancelada" or "Inativo" or "Estornado" or "Retirada" or "Rejeitada" or "Denegada" => (Cores.VermelhoFundo, "#991B1B"),
         "Fiado" or "Pendente" => (Cores.AmbarFundo, "#92400E"),
         _ => (Cores.CinzaFundo, Cores.Cinza),
     };

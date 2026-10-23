@@ -329,9 +329,13 @@ public sealed class VendaTela : Tela
         var venda = Svc.ObterVenda(vid);
         var titulo = $"Venda {vid:000000} registrada — {Util.FmtDinheiro(total)}{troco}";
         var desfazer = ("Desfazer", (Action)(() => Desfazer(vid)));
+        var notaFiscal = ("Nota fiscal", (Action)(() => _ = Fluxos.NotaFiscalAsync(Janela, App, vid)));
         var modo = Svc.ObterConfig(ConfigAposVenda, "aviso");
         switch (modo)
         {
+            case "nfce":
+                await Fluxos.NfceAposVendaAsync(Janela, App, vid);
+                break;
             case "perguntar":
                 if (await Confirmar($"{titulo}\n\nDeseja abrir a nota para imprimir / salvar em PDF?", "Venda registrada")) NotaDialog.AbrirNoNavegador(Janela, venda);
                 break;
@@ -345,6 +349,7 @@ public sealed class VendaTela : Tela
             default:
                 var botoes = new List<(string, Action)>
                 {
+                    notaFiscal,
                     ("Imprimir nota", () => NotaDialog.AbrirNoNavegador(Janela, venda)),
                     ("Cupom 80 mm", () => NotaDialog.AbrirNoNavegador(Janela, venda, cupom: true)),
                 };
@@ -392,6 +397,7 @@ public sealed class NotasTela : Tela
         Situacao.SelectionChanged += (_, _) => Seguro(Atualizar)();
 
         var acoes = K.Fila(4,
+            K.Botao("Nota fiscal", SeguroAsync(NotaFiscalAsync), icone: "nf", classe: "fantasma"),
             K.Botao("Ver nota", SeguroAsync(VisualizarAsync), icone: "ver", classe: "fantasma"),
             K.Botao("Imprimir / PDF", SeguroAsync(ImprimirAsync), icone: "imprimir", classe: "fantasma"),
             K.Botao("Cupom 80 mm", SeguroAsync(CupomAsync), icone: "notas", classe: "fantasma"),
@@ -425,6 +431,9 @@ public sealed class NotasTela : Tela
     }
 
     public Task VisualizarAsync() => NotaDialog.Abrir(Janela, Svc, Exigir(Tabela.IdLong, "uma nota"));
+
+    /// <summary>NFC-e/NF-e da venda selecionada (emite, completa o que falta ou abre o DANFE se já tiver).</summary>
+    public Task NotaFiscalAsync() => Fluxos.NotaFiscalAsync(Janela, App, Exigir(Tabela.IdLong, "uma venda"));
 
     public Task ImprimirAsync()
     {

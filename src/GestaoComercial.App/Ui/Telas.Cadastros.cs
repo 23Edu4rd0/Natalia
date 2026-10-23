@@ -318,7 +318,7 @@ public sealed class ProdutosTela : CadastroTela<Produto>
     protected override string NomeDe(Produto p) => p.Nome;
 
     protected override List<Campo> Campos(bool novo) => FormProduto.Campos(Svc, novo, App.Avancado);
-    protected override Dictionary<string, object?> Iniciais(Produto? p) => FormProduto.Iniciais(p);
+    protected override Dictionary<string, object?> Iniciais(Produto? p) => FormProduto.Iniciais(p, ncm: p == null ? null : Svc.ObterFiscalProduto(p.Id).Ncm);
     protected override Action<FormDialog, string>? AoMudarCampo => App.Avancado ? FormProduto.AoMudar : null;
     protected override void Salvar(Valores v, long? id) => FormProduto.Salvar(Svc, v, id);
 

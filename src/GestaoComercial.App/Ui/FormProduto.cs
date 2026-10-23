@@ -16,6 +16,7 @@ public static class FormProduto
         var c = new List<Campo> { new() { Chave = "nome", Rotulo = "Nome do produto", Obrigatorio = true } };
         if (avancado) c.Add(new Campo { Chave = "codigo", Rotulo = "Código / cód. barras", Dica = "Em branco = gerado automaticamente. Pode passar o leitor de código de barras aqui." });
         c.Add(new Campo { Chave = "categoria", Rotulo = "Tipo de produto", Tipo = TipoCampo.Escolha, Opcoes = cats });
+        if (avancado) c.Add(new Campo { Chave = "ncm", Rotulo = "NCM (para nota fiscal)", Dica = "8 números (ex.: 6109.10.00). Pode deixar em branco e informar na hora de emitir a nota." });
         if (avancado)
         {
             c.Add(new Campo { Chave = "unidade", Rotulo = "Unidade", Dica = "un, kg, cx, pct, l..." });
@@ -37,7 +38,7 @@ public static class FormProduto
         return c;
     }
 
-    public static Dictionary<string, object?> Iniciais(Produto? p, string? codigo = null, string? nome = null)
+    public static Dictionary<string, object?> Iniciais(Produto? p, string? codigo = null, string? nome = null, string? ncm = null)
     {
         if (p == null)
             return new() { ["unidade"] = "un", ["minimo"] = 0L, ["inicial"] = 0L, ["codigo"] = codigo ?? "", ["nome"] = nome ?? "" };
@@ -45,7 +46,7 @@ public static class FormProduto
         {
             ["nome"] = p.Nome, ["codigo"] = p.Codigo, ["categoria"] = p.CategoriaId, ["unidade"] = p.Unidade, ["custo"] = p.PrecoCusto,
             ["margem"] = p.PrecoCusto > 0 ? FmtMargem(p.PrecoVenda, p.PrecoCusto) : "", ["venda"] = p.PrecoVenda, ["minimo"] = p.EstoqueMin,
-            ["estoque"] = p.Estoque, ["ativo"] = p.Ativo,
+            ["estoque"] = p.Estoque, ["ativo"] = p.Ativo, ["ncm"] = ncm ?? "",
         };
     }
 
@@ -87,8 +88,16 @@ public static class FormProduto
         var atual = id is long i ? svc.ObterProduto(i) : null;
         string Txt(string k, string padrao) => v.Tem(k) ? v.Texto(k) : padrao;
         long Num(string k, long padrao) => v.Tem(k) ? v.Num(k) : padrao;
-        return svc.SalvarProduto(new ProdutoDados(v.Texto("nome"), Txt("codigo", atual?.Codigo ?? ""), v.Escolha("categoria"), Txt("unidade", atual?.Unidade ?? "un"),
+        var ncm = Util.SomenteDigitos(v.Texto("ncm"));
+        if (v.Tem("ncm") && ncm.Length is not (0 or 8)) throw new ValidacaoException("NCM deve ter 8 números (ou ficar em branco).");
+        var pid = svc.SalvarProduto(new ProdutoDados(v.Texto("nome"), Txt("codigo", atual?.Codigo ?? ""), v.Escolha("categoria"), Txt("unidade", atual?.Unidade ?? "un"),
                                                   Num("custo", atual?.PrecoCusto ?? 0), v.Num("venda"), Num("minimo", atual?.EstoqueMin ?? 0), v.Num("inicial"),
                                                   id == null || v.Bool("ativo")), id);
+        if (v.Tem("ncm"))
+        {
+            var f = svc.ObterFiscalProduto(pid);
+            if (f.Ncm != ncm) svc.SalvarFiscalProduto(f with { Ncm = ncm });
+        }
+        return pid;
     }
 }

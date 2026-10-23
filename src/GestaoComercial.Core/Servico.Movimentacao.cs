@@ -156,6 +156,9 @@ public partial class Servico
         {
             var st = Um("SELECT status FROM vendas WHERE id = ?", r => r.S("status"), id) ?? throw new NaoEncontradoException("Venda não encontrada.");
             if (st == "CANCELADA") throw new ConflitoException("Esta venda já foi cancelada.");
+            var nf = UmV("SELECT modelo, numero FROM notas_fiscais WHERE venda_id = ? AND status = 'AUTORIZADA' LIMIT 1", r => (Mod: r.L("modelo"), Num: r.L("numero")), id);
+            if (nf is { } x)
+                throw new ValidacaoException($"Esta venda tem a {(x.Mod == 65 ? "NFC-e" : "NF-e")} nº {x.Num} autorizada. Cancele a nota fiscal primeiro (página Notas fiscais).");
             foreach (var it in Todos("SELECT produto_id, quantidade FROM venda_itens WHERE venda_id = ?", r => (Pid: r.L("produto_id"), Qtd: r.L("quantidade")), id))
             {
                 Exec("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", it.Qtd, it.Pid);

@@ -197,7 +197,10 @@ public class MigracaoTests : IDisposable
             var p = s.SalvarProduto(new ProdutoDados("Antigo", PrecoVenda: 1000, EstoqueInicial: 5));
             s.RegistrarVenda(new[] { new ItemVendaInput(p, 1, 1000) });
             void Sql(string q) { using var cmd = c.CreateCommand(); cmd.CommandText = q; cmd.ExecuteNonQuery(); }
-            Sql("DROP TABLE recebimentos"); Sql("DROP TABLE caixa_movs"); Sql("PRAGMA user_version = 1");   // volta ao estado da versão 1
+            Sql("DROP TABLE recebimentos"); Sql("DROP TABLE caixa_movs");                                     // volta ao estado da versão 1
+            Sql("DROP TABLE notas_fiscais"); Sql("DROP TABLE clientes_fiscal");
+            foreach (var col in new[] { "ncm", "cest", "origem", "cfop", "tributacao" }) Sql($"ALTER TABLE produtos DROP COLUMN {col}");
+            Sql("PRAGMA user_version = 1");
         }
         using (var c = Banco.Conectar(arq))
         {
@@ -207,7 +210,7 @@ public class MigracaoTests : IDisposable
             Assert.Single(s.ListarVendas());
             Assert.Empty(s.ListarDevedores());
             s.RegistrarMovimentoCaixa("SUPRIMENTO", 100, "ok");        // tabelas novas funcionam
-            using var cmd = c.CreateCommand(); cmd.CommandText = "PRAGMA user_version"; Assert.Equal(2L, cmd.ExecuteScalar());
+            using var cmd = c.CreateCommand(); cmd.CommandText = "PRAGMA user_version"; Assert.Equal((long)Banco.VersaoEsquema, cmd.ExecuteScalar());
         }
     }
 }

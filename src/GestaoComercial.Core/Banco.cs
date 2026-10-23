@@ -5,7 +5,7 @@ namespace GestaoComercial.Core;
 /// <summary>Conexão SQLite e criação/migração do esquema (idêntico ao da versão Python).</summary>
 public static class Banco
 {
-    public const int VersaoEsquema = 2;
+    public const int VersaoEsquema = 3;
 
     public static SqliteConnection Conectar(string caminho)
     {
@@ -54,6 +54,7 @@ public static class Banco
             throw new AppException("Este banco de dados foi criado por uma versão mais nova do programa. Atualize o programa para abri-lo.");
         if (versao < 1) Rodar(conn, EsquemaV1);
         if (versao < 2) Rodar(conn, EsquemaV2);
+        if (versao < 3) Rodar(conn, EsquemaV3);
     }
 
     static void Rodar(SqliteConnection conn, string sql)
@@ -62,6 +63,56 @@ public static class Banco
         c.CommandText = sql;
         c.ExecuteNonQuery();
     }
+
+    /// <summary>v3: nota fiscal eletrônica (dados fiscais dos produtos, endereço fiscal dos clientes e notas emitidas).</summary>
+    const string EsquemaV3 = """
+BEGIN;
+ALTER TABLE produtos ADD COLUMN ncm TEXT NOT NULL DEFAULT '';
+ALTER TABLE produtos ADD COLUMN cest TEXT NOT NULL DEFAULT '';
+ALTER TABLE produtos ADD COLUMN origem INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE produtos ADD COLUMN cfop TEXT NOT NULL DEFAULT '';
+ALTER TABLE produtos ADD COLUMN tributacao TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE clientes_fiscal (
+    cliente_id   INTEGER PRIMARY KEY REFERENCES clientes(id),
+    ie           TEXT NOT NULL DEFAULT '',
+    ind_ie       INTEGER NOT NULL DEFAULT 9,
+    logradouro   TEXT NOT NULL DEFAULT '',
+    numero       TEXT NOT NULL DEFAULT '',
+    complemento  TEXT NOT NULL DEFAULT '',
+    bairro       TEXT NOT NULL DEFAULT '',
+    cod_municipio TEXT NOT NULL DEFAULT '',
+    municipio    TEXT NOT NULL DEFAULT '',
+    uf           TEXT NOT NULL DEFAULT '',
+    cep          TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE notas_fiscais (
+    id         INTEGER PRIMARY KEY,
+    venda_id   INTEGER NOT NULL REFERENCES vendas(id),
+    modelo     INTEGER NOT NULL CHECK (modelo IN (55, 65)),
+    serie      INTEGER NOT NULL,
+    numero     INTEGER NOT NULL,
+    ambiente   INTEGER NOT NULL CHECK (ambiente IN (1, 2)),
+    status     TEXT NOT NULL CHECK (status IN ('PENDENTE', 'AUTORIZADA', 'REJEITADA', 'DENEGADA', 'CANCELADA', 'INUTILIZADA')),
+    chave      TEXT NOT NULL DEFAULT '',
+    protocolo  TEXT NOT NULL DEFAULT '',
+    cstat      INTEGER NOT NULL DEFAULT 0,
+    motivo     TEXT NOT NULL DEFAULT '',
+    criada_em  TEXT NOT NULL,
+    emitida_em TEXT NOT NULL DEFAULT '',
+    dest_doc   TEXT NOT NULL DEFAULT '',
+    dest_nome  TEXT NOT NULL DEFAULT '',
+    total      INTEGER NOT NULL DEFAULT 0,
+    xml        TEXT NOT NULL DEFAULT '',
+    xml_evento TEXT NOT NULL DEFAULT '',
+    UNIQUE (modelo, serie, numero, ambiente)
+);
+CREATE INDEX ix_notas_fiscais_venda ON notas_fiscais(venda_id);
+
+PRAGMA user_version = 3;
+COMMIT;
+""";
 
     /// <summary>v2: fiado (recebimentos de clientes) e movimentos manuais do caixa (suprimento/sangria).</summary>
     const string EsquemaV2 = """

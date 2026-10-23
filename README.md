@@ -31,6 +31,29 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 ## O que ele faz
 
+**Novidades da 2.5: nota fiscal eletrônica de verdade (NFC-e e NF-e)**
+- **Emite NFC-e** (cupom fiscal, modelo 65) e **NF-e** (modelo 55) direto para a SEFAZ, com o certificado digital A1 da loja. Layout 4.00, XML assinado e conferido nos esquemas oficiais antes de enviar.
+- **O que falta, a pessoa completa na hora**: na tela *Emitir nota fiscal* vem tudo preenchido com o que o programa já sabe; o que faltar (NCM do produto, CPF/CNPJ, endereço do cliente na NF-e, inscrição estadual…) fica **em vermelho** para preencher ali mesmo. Com *“Guardar nos cadastros”* marcado, da próxima vez já vem preenchido.
+- **Onde emitir**: botão **Nota fiscal** no aviso depois da venda e na lista de **Vendas**. Ou, em *Configurações → Ao finalizar uma venda*, escolha *“Emitir a NFC-e na hora”*: se não faltar nada, sai sozinha e abre o cupom; se faltar, abre a tela para completar.
+- **DANFE** para imprimir ou salvar em PDF: cupom 80 mm com QR Code (NFC-e) e folha A4 com código de barras da chave (NF-e).
+- **Aba Notas fiscais**: reimprimir, abrir o XML (fica guardado para o contador em `notas-fiscais/AAAA-MM/`), **tentar de novo / consultar** nota sem resposta, **cancelar** nota (e depois a venda, devolvendo ao estoque) e **inutilizar** número de nota rejeitada.
+- **Sem internet ou SEFAZ fora do ar**: a nota fica *pendente* com o mesmo número; ao tentar de novo, o programa primeiro pergunta à SEFAZ se ela já foi autorizada (nunca gera nota em duplicidade).
+- **Configuração em uma tela** (*Configurações → Nota fiscal eletrônica*): “Buscar dados” preenche razão social, endereço e regime pelo CNPJ; “Buscar CEP” preenche o código IBGE; teste de comunicação com a SEFAZ; numeração que pode continuar de outro programa. Começa em **homologação** (notas de teste, sem valor fiscal).
+- Simples Nacional / MEI (CSOSN) e regime normal (CST com ICMS, PIS e COFINS); tributos aproximados (Lei 12.741); Pix, cartão, dinheiro e fiado; CNPJ alfanumérico (2026).
+
+**O que a loja precisa para emitir de verdade**
+1. **Certificado digital A1** (arquivo `.pfx` + senha), comprado numa certificadora. *Certificado A3 (cartão/token) não funciona.*
+2. **Inscrição estadual** ativa e a empresa **credenciada para emitir NFC-e/NF-e** na SEFAZ do estado (o contador faz/confirma).
+3. Para NFC-e: o **CSC** e o **ID do CSC**, gerados no site da SEFAZ do estado.
+4. O **NCM** de cada produto (está na nota do fornecedor ou o contador informa) e a tributação certa (CSOSN/CST, CFOP) — **confira com o contador**.
+5. Emitir algumas notas em **homologação**, conferir, e só então mudar para **produção** na configuração.
+
+**Limites conhecidos (desta versão)**
+- Não foi testado contra a SEFAZ real neste desenvolvimento (precisa do certificado e do CSC da loja): os testes usam uma SEFAZ simulada, mas o XML é validado nos esquemas oficiais.
+- Não emite em **contingência offline** (sem internet a nota fica pendente para reenviar).
+- Não calcula **DIFAL** (venda a consumidor de outro estado no regime normal: o programa avisa e não emite), nem substituição tributária com valores, nem os campos novos da reforma tributária (IBS/CBS).
+- Não envia a nota por e-mail sozinho (o XML e o DANFE ficam na pasta para enviar).
+
 **Novidades da 2.4 (visual novo)**
 - **Visual redesenhado**: menu lateral claro com o nome da loja, cartões com números grandes, listas com busca e ações no mesmo cartão, campos com destaque ao digitar, formulários e mensagens mais limpos. Funciona bem em tela grande (1920) e em notebook.
 - **Sugestões enquanto digita o produto** (na venda e na entrada): aparece a lista com nome, código, preço e estoque; setas ↑ ↓ e Enter adicionam, sem precisar saber o código. Não liga para acentos ("calca" acha "Calça").
@@ -64,11 +87,12 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 **Acompanhar**: **Início** com os números do dia e atalhos, **Relatórios** (faturamento, ticket médio, lucro, mais vendidos, formas de pagamento) e **backup** automático diário.
 
-> ⚠️ **As notas são comprovantes internos e NÃO têm valor fiscal.** NF-e / NFC-e exigem certificado digital e emissor autorizado pela SEFAZ.
+> ⚠️ O **comprovante de venda** (botões *Nota* / *Cupom*) é interno e **não tem valor fiscal**. A nota fiscal de verdade é a **NFC-e / NF-e**, emitida pelo botão **Nota fiscal** (veja acima o que a loja precisa).
 
 ## Onde ficam os dados
 Windows: `%APPDATA%\GestaoComercial` — Linux: `~/.local/share/gestao-comercial` (troque com a variável `GESTAO_DATA_DIR`).
-Dentro: `gestao.db`, `backups/`, `notas/`, `exportacoes/` e `logs/gestao.log`.
+Dentro: `gestao.db`, `backups/`, `notas/`, `notas-fiscais/` (XML das NFC-e/NF-e, para o contador), `certificado/`, `exportacoes/` e `logs/gestao.log`.
+A senha do certificado digital não fica em texto puro (no Windows é protegida pelo próprio sistema, para o seu usuário).
 **Atualizando:** bancos de versões anteriores (inclusive os da versão Python) são atualizados sozinhos na primeira abertura, sem perder nada. Depois disso, não abra o mesmo banco na versão Python. Para levar para outro PC, copie o `gestao.db`.
 
 ## Como lida com erros
@@ -81,5 +105,11 @@ Dentro: `gestao.db`, `backups/`, `notas/`, `exportacoes/` e `logs/gestao.log`.
 ```
 src/GestaoComercial.Core   regras de negócio e SQLite (sem interface)
 src/GestaoComercial.App    telas (Avalonia)
-tests/GestaoComercial.Tests  177 testes: regras + interface renderizada em memória   →   dotnet test
+tests/GestaoComercial.Tests  209 testes: regras + interface renderizada em memória   →   dotnet test
 ```
+
+## Bibliotecas de terceiros
+- [Hercules.NET / ZeusFiscal](https://github.com/Hercules-NET/ZeusFiscal) (LGPL-2.1): montagem, assinatura e comunicação da NF-e/NFC-e com a SEFAZ. O código-fonte dela está no link; ela é usada como biblioteca, sem alterações.
+- [QRCoder](https://github.com/codebude/QRCoder) (MIT): QR Code da NFC-e.
+- [Avalonia UI](https://avaloniaui.net/) (MIT), Microsoft.Data.Sqlite (MIT).
+- Esquemas XML oficiais da NF-e (Portal Nacional da NF-e).

@@ -12,7 +12,7 @@ public class ModoSimplesTests
     static long Prod(Servico s, string nome, long estoque = 20, long venda = 1000) =>
         s.SalvarProduto(new ProdutoDados(nome, PrecoCusto: venda / 2, PrecoVenda: venda, EstoqueInicial: estoque, Unidade: "kg", EstoqueMin: 3));
 
-    static readonly string[] Simples = { "Painel", "Nova venda", "Vendas", "A receber", "Clientes", "Produtos", "Configurações" };
+    static readonly string[] Simples = { "Painel", "Nova venda", "Vendas", "Notas fiscais", "A receber", "Clientes", "Produtos", "Configurações" };
 
     [AvaloniaFact]
     public void Padrao_e_simples_e_o_menu_so_tem_o_necessario()
@@ -33,7 +33,7 @@ public class ModoSimplesTests
         c.Modo.SelectedIndex = 1; Ambiente.Rodar();
         Assert.True(a.Janela.Avancado);
         Assert.Equal("avancado", a.S.ObterConfig(MainWindow.ConfigModo));
-        Assert.Equal(12, a.Janela.MenuVisivel.Count);
+        Assert.Equal(13, a.Janela.MenuVisivel.Count);
         Assert.Contains("Entrada de mercadorias", a.Janela.MenuVisivel);
         Assert.Equal("Configurações", a.Janela.PaginaAtual);                       // continua na mesma página
         Assert.Equal(1, a.Tela<ConfigTela>("Configurações").Modo.SelectedIndex);   // a tela refeita já mostra o modo novo
@@ -80,7 +80,7 @@ public class ModoSimplesTests
         var t = a.Tela<ProdutosTela>("Produtos");
         await a.ComDialogo<FormDialog>(t.NovoAsync, d =>
         {
-            Assert.Equal(new[] { "nome", "codigo", "categoria", "unidade", "custo", "margem", "venda", "minimo", "inicial" }, d.Chaves);
+            Assert.Equal(new[] { "nome", "codigo", "categoria", "ncm", "unidade", "custo", "margem", "venda", "minimo", "inicial" }, d.Chaves);
             d.Close();
         });
     }

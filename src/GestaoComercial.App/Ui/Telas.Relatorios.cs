@@ -124,6 +124,7 @@ public sealed class ConfigTela : Tela
         ("cupom", "Abrir o cupom 80 mm automaticamente"),
         ("perguntar", "Perguntar se quero imprimir"),
         ("nada", "Não fazer nada (só o aviso com Desfazer)"),
+        ("nfce", "Emitir a NFC-e (cupom fiscal) na hora — pede só o que faltar"),
     };
     bool carregando;
 
@@ -166,7 +167,7 @@ public sealed class ConfigTela : Tela
                     K.Margem(Icones.Criar("info", 20, "#D97706"), 0, 0, 12, 0),
                     new TextBlock
                     {
-                        Text = "As notas deste programa são comprovantes internos de venda e NÃO têm valor fiscal. Para NF-e / NFC-e é preciso um emissor autorizado pela SEFAZ.",
+                        Text = "O comprovante de venda (botão “Nota”/“Cupom”) é interno e NÃO tem valor fiscal. A nota fiscal de verdade é a NFC-e / NF-e, emitida pelo botão “Nota fiscal” depois de configurar ao lado.",
                         TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13, Foreground = Cores.P("#92400E"),
                     },
                 },
@@ -214,13 +215,26 @@ public sealed class ConfigTela : Tela
         var backup = K.Secao("Backup e dados", bk, icone: "nuvem");
 
         var esquerda = new StackPanel { Spacing = 20, Children = { loja, aviso } };
-        var direita = new StackPanel { Spacing = 20, Children = { modo, venda, backup } };
+        lblFiscal = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 13.5 };
+        var fiscal = K.Secao("Nota fiscal eletrônica (NF-e / NFC-e)", new StackPanel
+        {
+            Spacing = 12,
+            Children = { lblFiscal, K.Linha(8, K.Botao("Configurar nota fiscal…", SeguroAsync(ConfigurarFiscalAsync), icone: "ajustes", classe: "primario"), K.Botao("Ver notas emitidas", () => App.IrPara("Notas fiscais"), classe: "fantasma")) },
+        }, subtitulo: "Notas de verdade, enviadas à SEFAZ. Precisa do certificado digital A1 da empresa.", icone: "nf");
+        var direita = new StackPanel { Spacing = 20, Children = { fiscal, modo, venda, backup } };
         var colunas = new Grid { ColumnDefinitions = new ColumnDefinitions("*,20,*"), MaxWidth = 1500, HorizontalAlignment = HorizontalAlignment.Left };
         K.ColocarNaGrade(colunas, esquerda, 0, 0); K.ColocarNaGrade(colunas, direita, 0, 2);
         Content = new ScrollViewer { Content = colunas, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
     }
 
     Button opcaoSimples = null!, opcaoAvancada = null!;
+    TextBlock lblFiscal = null!;
+    public string TextoFiscal => lblFiscal.Text ?? "";
+
+    public async Task ConfigurarFiscalAsync()
+    {
+        if (await ConfigFiscalDialog.Abrir(Janela, Svc)) Atualizar();
+    }
 
     void MarcarModo()
     {
@@ -236,6 +250,12 @@ public sealed class ConfigTela : Tela
         var idx = Array.FindIndex(OpcoesAposVenda, o => o.Valor == Svc.ObterConfig(VendaTela.ConfigAposVenda, "aviso"));
         AposVenda.SelectedIndex = idx < 0 ? 0 : idx;
         carregando = false;
+        var cf = Svc.ObterConfigFiscal();
+        var pend = cf.Pendencias(65, verificarCertificado: false);
+        lblFiscal.Text = pend.Count > 0 ? $"Ainda não configurada: falta {pend.Count} item(ns)."
+                       : cf.Producao ? $"Pronta, em PRODUÇÃO (notas com valor fiscal). CNPJ {Util.FmtDocumento(cf.Cnpj)} – {cf.Uf}."
+                       : $"Pronta, em HOMOLOGAÇÃO (notas de teste). CNPJ {Util.FmtDocumento(cf.Cnpj)} – {cf.Uf}.";
+        lblFiscal.Foreground = Cores.P(pend.Count > 0 ? "#92400E" : cf.Producao ? "#065F46" : Cores.Corpo);
         var e = Svc.ObterEmpresa();
         Nome.Text = e.Nome; Documento.Text = Util.FmtDocumento(e.Documento); Endereco.Text = e.Endereco; Telefone.Text = e.Telefone; Rodape.Text = e.Rodape;
     }

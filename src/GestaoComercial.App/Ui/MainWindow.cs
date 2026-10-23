@@ -102,6 +102,7 @@ public sealed class MainWindow : JanelaBase
         Grupo("Vendas");
         Item("Nova venda", "venda", () => new VendaTela(this), "Atalho: F2");
         Item("Vendas", "notas", () => new NotasTela(this));
+        Item("Notas fiscais", "nf", () => new NotasFiscaisTela(this));
         Item("Caixa", "caixa", () => new CaixaTela(this), soAvancado: true);
         Item("A receber", "receber", () => new ReceberTela(this));
         Grupo("Cadastros");
@@ -198,7 +199,7 @@ public sealed class MainWindow : JanelaBase
 
     public void Sobre() => _ = Plat.Atual.Mensagem(this, "Sobre",
         $"{Config.NomeApp} {Config.Versao}\n\nVendas, caixa, fiado, clientes, estoque e notas em um só lugar.\n\n" +
-        $"Dados: {Config.PastaDados()}\nLog: {Config.ArquivoLog()}\n\nAtalhos: F2 nova venda · F9 finalizar venda · F1 ajuda\n\nAs notas são comprovantes internos, sem valor fiscal.", Nivel.Info);
+        $"Dados: {Config.PastaDados()}\nLog: {Config.ArquivoLog()}\n\nAtalhos: F2 nova venda · F9 finalizar venda · F1 ajuda\n\nO comprovante de venda é interno, sem valor fiscal. A nota fiscal eletrônica (NFC-e / NF-e) é emitida em “Notas fiscais”.", Nivel.Info);
 
     // ------------------------------------------------------------------ avisos rápidos
     /// <summary>Mostra um aviso no canto da tela que some sozinho (mais tempo se tiver botões).</summary>

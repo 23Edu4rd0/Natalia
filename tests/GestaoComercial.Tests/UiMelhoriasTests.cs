@@ -146,7 +146,7 @@ public class UiMelhoriasTests
         var v = Assert.Single(a.S.ListarVendas());
         Assert.Equal("Ana Lima", v.ClienteNome); Assert.Equal(4, a.S.ObterProduto(p).Estoque);
         var rotulos = a.P.UltimoToast.Acoes.Select(x => x.Rotulo).ToList();
-        Assert.Equal(new[] { "Imprimir nota", "Cupom 80 mm", "WhatsApp", "Desfazer" }, rotulos);   // WhatsApp porque o cliente tem telefone
+        Assert.Equal(new[] { "Nota fiscal", "Imprimir nota", "Cupom 80 mm", "WhatsApp", "Desfazer" }, rotulos);   // WhatsApp porque o cliente tem telefone
         a.P.ClicarToast("WhatsApp"); Assert.StartsWith("https://wa.me/5511911112222?text=", a.P.Abertos[^1]);
         a.P.ClicarToast("Cupom 80 mm"); Assert.Contains("cupom-", a.P.Abertos[^1]);
         a.P.ClicarToast("Desfazer");                                                    // "errei!" -> um clique desfaz

@@ -74,4 +74,53 @@ public static class Fluxos
             await Plat.Atual.Mensagem(dono, "Arquivo salvo",
                 $"Não foi possível abrir o navegador automaticamente.\n\nO arquivo foi salvo em:\n{caminho}\n\nAbra-o no navegador para imprimir ou salvar como PDF.", Nivel.Info);
     }
+
+    // ------------------------------------------------------------------ nota fiscal eletrônica
+    /// <summary>Abre o DANFE (cupom da NFC-e ou folha da NF-e) no navegador para imprimir/salvar em PDF.</summary>
+    public static Task AbrirDanfeAsync(Window? dono, Core.NotaFiscal n) =>
+        ImprimirHtmlAsync(dono, Core.Fiscal.Danfe.Html(n), $"danfe-{(n.Chave.Length > 0 ? n.Chave : n.Id.ToString())}.html");
+
+    /// <summary>Modelo sugerido: NF-e quando o cliente da venda tem CNPJ; senão NFC-e.</summary>
+    public static int ModeloSugerido(Servico svc, long vendaId) => Util.SomenteDigitos(svc.ObterVenda(vendaId).ClienteDoc).Length == 14 ? 55 : 65;
+
+    /// <summary>
+    /// Nota fiscal da venda: se já existe autorizada, abre o DANFE; senão abre a tela de emissão
+    /// (com o que faltar para a pessoa completar) e, autorizada, mostra o DANFE.
+    /// </summary>
+    public static async Task NotaFiscalAsync(Window? dono, MainWindow app, long vendaId, int? modelo = null)
+    {
+        var svc = app.Svc;
+        if (svc.NotasDaVenda(vendaId).FirstOrDefault(n => n.Autorizada) is { } aut) { await AbrirDanfeAsync(dono, aut); return; }
+        var r = await EmitirNotaDialog.Abrir(dono, svc, vendaId, modelo ?? ModeloSugerido(svc, vendaId));
+        if (r != null) app.AtualizarTudo();
+        if (r is { Autorizada: true }) await AvisarAutorizadaAsync(dono, svc, r);
+    }
+
+    /// <summary>
+    /// Depois da venda: se não falta nada, emite a NFC-e direto (sem abrir janela) e abre o cupom;
+    /// se falta algo (NCM de um produto, certificado...), abre a tela de emissão para completar.
+    /// </summary>
+    public static async Task NfceAposVendaAsync(Window? dono, MainWindow app, long vendaId)
+    {
+        var svc = app.Svc;
+        var d = svc.PrepararNota(vendaId, 65);
+        if (Core.Fiscal.RegrasNota.Verificar(d, svc.ObterConfigFiscal()).Count > 0) { await NotaFiscalAsync(dono, app, vendaId, 65); return; }
+        Plat.Atual.Toast(dono, "Emitindo a NFC-e…", Nivel.Info, null, 3);
+        Core.Fiscal.ResultadoNota r;
+        try { r = EmitirNotaDialog.EmSegundoPlano ? await Task.Run(() => svc.EmitirNota(d)) : svc.EmitirNota(d); }
+        catch (ValidacaoException) { await NotaFiscalAsync(dono, app, vendaId, 65); return; }
+        app.AtualizarTudo();
+        if (r.Autorizada) { await AvisarAutorizadaAsync(dono, svc, r); return; }
+        Plat.Atual.Toast(dono, r.Mensagem, Nivel.Aviso, new (string, Action)[] { ("Abrir a nota", () => _ = NotaFiscalAsync(dono, app, vendaId, 65)) }, 15);
+    }
+
+    static async Task AvisarAutorizadaAsync(Window? dono, Servico svc, Core.Fiscal.ResultadoNota r)
+    {
+        var n = svc.ObterNotaFiscal(r.NotaId);
+        Plat.Atual.Toast(dono, r.Mensagem, Nivel.Info, new (string, Action)[]
+        {
+            ("Imprimir de novo", () => _ = AbrirDanfeAsync(dono, svc.ObterNotaFiscal(r.NotaId))),
+        }, 8);
+        await AbrirDanfeAsync(dono, n);
+    }
 }

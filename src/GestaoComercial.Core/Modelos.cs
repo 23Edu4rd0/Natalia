@@ -56,6 +56,24 @@ public record ResumoVendas(long Qtd, long Total, long Descontos, long Custo, lon
     public long TicketMedio => Qtd > 0 ? Total / Qtd : 0;
 }
 
+/// <summary>Dados fiscais do produto (vazio = usa o padrão da configuração fiscal).</summary>
+public record FiscalProduto(long ProdutoId, string Ncm, string Cest, int Origem, string Cfop, string Tributacao);
+
+/// <summary>Endereço/inscrição do cliente usados na NF-e (guardados para a próxima nota).</summary>
+public record FiscalCliente(long ClienteId, string IE, int IndIE, string Logradouro, string Numero, string Complemento, string Bairro,
+                            string CodMunicipio, string Municipio, string Uf, string Cep);
+
+/// <summary>Nota fiscal eletrônica emitida (ou tentada) para uma venda. Modelo 65 = NFC-e, 55 = NF-e.</summary>
+public record NotaFiscal(long Id, long VendaId, int Modelo, int Serie, long Numero, int Ambiente, string Status, string Chave, string Protocolo,
+                         int CStat, string Motivo, string CriadaEm, string EmitidaEm, string DestDoc, string DestNome, long Total, string Xml, string XmlEvento)
+{
+    public string Tipo => Modelo == 65 ? "NFC-e" : "NF-e";
+    public bool Homologacao => Ambiente == 2;
+    public bool Autorizada => Status == "AUTORIZADA";
+    /// <summary>Pode tentar de novo com o mesmo número (nunca foi aceita pela SEFAZ).</summary>
+    public bool PodeReenviar => Status is "PENDENTE" or "REJEITADA";
+}
+
 /// <summary>Vendas concluídas de um dia (Data em aaaa-mm-dd).</summary>
 public record VendaDia(string Data, long Qtd, long Total);
 

@@ -1,4 +1,4 @@
-GESTÃO COMERCIAL 2.4.0
+GESTÃO COMERCIAL 2.5.0
 
 WINDOWS
 1. Baixe GestaoComercial-Windows.zip
@@ -15,3 +15,15 @@ O programa abre no MODO SIMPLES (só o necessário para vender).
 Para ver todas as funções: Configurações > Modo de uso > Avançado.
 
 Seus dados ficam em %APPDATA%\GestaoComercial (Windows) ou ~/.local/share/gestao-comercial (Linux).
+
+NOTA FISCAL ELETRÔNICA (NFC-e e NF-e) — novo na 2.5.0
+Configure em: Configurações > Nota fiscal eletrônica > Configurar nota fiscal.
+Você vai precisar de:
+  - Certificado digital A1 da empresa (arquivo .pfx) e a senha dele. (A3, de cartão/token, não funciona.)
+  - Inscrição estadual e a empresa credenciada na SEFAZ para emitir NFC-e/NF-e (pergunte ao contador).
+  - Para NFC-e: o CSC e o ID do CSC, gerados no site da SEFAZ do seu estado.
+  - O NCM de cada produto (dá para preencher na hora de emitir; o programa guarda).
+O programa começa em HOMOLOGAÇÃO (notas de teste, sem valor fiscal). Faça alguns testes e só depois
+mude para PRODUÇÃO na mesma tela. Confira a tributação (CSOSN/CST, CFOP) com o seu contador.
+Para emitir: depois da venda, clique em "Nota fiscal" (ou na lista de Vendas). O que faltar fica em
+vermelho para você completar ali mesmo.
