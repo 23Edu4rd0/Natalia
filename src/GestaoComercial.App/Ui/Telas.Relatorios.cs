@@ -255,6 +255,8 @@ public sealed class ConfigTela : Tela
         lblFiscal.Text = pend.Count > 0 ? $"Ainda não configurada: falta {pend.Count} item(ns)."
                        : cf.Producao ? $"Pronta, em PRODUÇÃO (notas com valor fiscal). CNPJ {Util.FmtDocumento(cf.Cnpj)} – {cf.Uf}."
                        : $"Pronta, em HOMOLOGAÇÃO (notas de teste). CNPJ {Util.FmtDocumento(cf.Cnpj)} – {cf.Uf}.";
+        if (pend.Count == 0 && Svc.ContingenciaAtiva() is { } cont)
+            lblFiscal.Text += $"\nEm CONTINGÊNCIA (sem comunicação com a SEFAZ) desde {cont.Inicio.LocalDateTime:dd/MM HH:mm}: {Svc.NotasEmContingencia().Count} NFC-e esperando envio.";
         lblFiscal.Foreground = Cores.P(pend.Count > 0 ? "#92400E" : cf.Producao ? "#065F46" : Cores.Corpo);
         var e = Svc.ObterEmpresa();
         Nome.Text = e.Nome; Documento.Text = Util.FmtDocumento(e.Documento); Endereco.Text = e.Endereco; Telefone.Text = e.Telefone; Rodape.Text = e.Rodape;

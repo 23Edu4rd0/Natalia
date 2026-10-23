@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using DFe.Classes.Entidades;
 using DFe.Classes.Flags;
+using DFe.Utils;
 using NFe.Classes.Informacoes;
 using NFe.Classes.Informacoes.Destinatario;
 using NFe.Classes.Informacoes.Detalhe;
@@ -85,8 +86,11 @@ public static class EmissorNFe
     }
 
     // ------------------------------------------------------------------ montagem
-    public static NFeDoc Montar(ConfigFiscal cfg, DadosNota d, int numero, DateTimeOffset dhEmi)
+    /// <param name="contingencia">NFC-e emitida sem internet (tpEmis 9): quando entrou em contingência e por quê.</param>
+    /// <param name="codigoNumerico">cNF da chave. Ao corrigir uma nota em contingência rejeitada, mantém o da nota já entregue ao cliente (a chave não muda).</param>
+    public static NFeDoc Montar(ConfigFiscal cfg, DadosNota d, int numero, DateTimeOffset dhEmi, Contingencia? contingencia = null, string? codigoNumerico = null)
     {
+        if (contingencia != null && d.Modelo != 65) throw new ValidacaoException("A contingência offline só existe para a NFC-e.");
         var nfce = d.Modelo == 65;
         var homolog = !cfg.Producao;
         var serie = nfce ? cfg.SerieNfce : cfg.SerieNfe;
@@ -99,13 +103,19 @@ public static class EmissorNFe
             cUF = EstadoDe(cfg.Uf), natOp = Limitar(cfg.NaturezaOperacao.Trim().Length > 0 ? cfg.NaturezaOperacao : "VENDA DE MERCADORIA", 60),
             mod = nfce ? ModeloDocumento.NFCe : ModeloDocumento.NFe, serie = serie, nNF = numero, tpNF = TipoNFe.tnSaida,
             cMunFG = long.Parse(Util.SomenteDigitos(cfg.CodMunicipio)), tpEmis = TipoEmissao.teNormal,
-            tpImp = nfce ? TipoImpressao.tiNFCe : TipoImpressao.tiRetrato, cNF = CodigoNumerico(numero),
+            tpImp = nfce ? TipoImpressao.tiNFCe : TipoImpressao.tiRetrato, cNF = codigoNumerico is { Length: 8 } ? codigoNumerico : CodigoNumerico(numero),
             tpAmb = homolog ? TipoAmbiente.Homologacao : TipoAmbiente.Producao, finNFe = FinalidadeNFe.fnNormal,
             verProc = Limitar($"GestaoComercial {Config.Versao}", 20), idDest = outroEstado ? DestinoOperacao.doInterestadual : DestinoOperacao.doInterna,
             dhEmi = dhEmi, procEmi = ProcessoEmissao.peAplicativoContribuinte,
             indFinal = contribuinte ? ConsumidorFinal.cfNao : ConsumidorFinal.cfConsumidorFinal,
             indPres = PresencaComprador.pcPresencial,
         };
+        if (contingencia != null)
+        {
+            ide.tpEmis = TipoEmissao.teOffLine;
+            ide.dhCont = contingencia.Inicio <= dhEmi ? contingencia.Inicio : dhEmi;
+            ide.xJust = Limitar(contingencia.Justificativa, 256);
+        }
 
         var emit = new emit
         {
@@ -219,6 +229,14 @@ public static class EmissorNFe
         if (nfe.infNFe.ide.mod == ModeloDocumento.NFCe)
         {
             var versao = cfg.VersaoQrCode == 3 ? VersaoQrCode.QrCodeVersao3 : VersaoQrCode.QrCodeVersao2;
+            if (versao == VersaoQrCode.QrCodeVersao3 && nfe.infNFe.ide.tpEmis == TipoEmissao.teOffLine)
+            {
+                // QR Code v3 em contingência é assinado com o certificado: a biblioteca o abre pela configuração
+                conf.Certificado.TipoCertificado = TipoCertificado.A1Arquivo;
+                conf.Certificado.Arquivo = cfg.CertificadoArquivo;
+                conf.Certificado.Senha = cfg.CertificadoSenha;
+                conf.Certificado.KeyStorageFlags = X509KeyStorageFlags.Exportable;
+            }
             nfe.infNFeSupl = new NFe.Classes.infNFeSupl();
             nfe.infNFeSupl.urlChave = nfe.infNFeSupl.ObterUrlConsulta(nfe, versao);
             nfe.infNFeSupl.qrCode = nfe.infNFeSupl.ObterUrlQrCode(nfe, versao, cfg.CscId.Trim().TrimStart('0') is { Length: > 0 } id ? id : "0", cfg.Csc.Trim(), conf.Certificado);

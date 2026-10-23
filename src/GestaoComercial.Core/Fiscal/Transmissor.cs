@@ -24,8 +24,12 @@ public interface ITransmissorSefaz
 {
     RespostaSefaz Autorizar(NFeDoc nfe, ConfiguracaoServico conf, X509Certificate2 cert);
     RespostaSefaz Consultar(string chave, ConfiguracaoServico conf, X509Certificate2 cert);
-    /// <summary>Cancelamento: devolve o XML do evento registrado (procEventoNFe) quando aceito.</summary>
-    (RespostaSefaz Resposta, string XmlEvento) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert);
+    /// <summary>
+    /// Cancelamento: devolve o XML do evento registrado (procEventoNFe) quando aceito. Com <paramref name="chaveSubstituta"/>
+    /// é o cancelamento por substituição (NFC-e autorizada que foi trocada por outra emitida em contingência).
+    /// </summary>
+    (RespostaSefaz Resposta, string XmlEvento) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert,
+                                                         string? chaveSubstituta = null);
     RespostaSefaz Inutilizar(string cnpj, int ano, int modelo, int serie, int numero, string justificativa, ConfiguracaoServico conf, X509Certificate2 cert);
     RespostaSefaz Status(ConfiguracaoServico conf, X509Certificate2 cert);
 }
@@ -72,10 +76,13 @@ public sealed class TransmissorSefaz : ITransmissorSefaz
         return new RespostaSefaz(ret.cStat, ret.xMotivo);
     });
 
-    public (RespostaSefaz, string) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert) => Chamar(() =>
+    public (RespostaSefaz, string) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert,
+                                            string? chaveSubstituta = null) => Chamar(() =>
     {
         using var s = new ServicosNFe(conf, cert);
-        var ret = s.RecepcaoEventoCancelamento(1, 1, protocolo, chave, justificativa, cnpj, DateTimeOffset.Now);
+        var ret = chaveSubstituta is { Length: 44 }
+            ? s.RecepcaoEventoCancelamentoPorSubstituicao(1, 1, protocolo, chave, justificativa, cnpj, conf.cUF, Limitar($"GestaoComercial {Config.Versao}", 20), chaveSubstituta, DateTimeOffset.Now)
+            : s.RecepcaoEventoCancelamento(1, 1, protocolo, chave, justificativa, cnpj, DateTimeOffset.Now);
         var inf = ret.Retorno.retEvento?.FirstOrDefault()?.infEvento;
         var xml = ret.ProcEventosNFe?.FirstOrDefault() is { } proc ? FuncoesXml.ClasseParaXmlString(proc) : "";
         return (inf != null ? new RespostaSefaz(inf.cStat, inf.xMotivo, inf.nProt ?? "") : new RespostaSefaz(ret.Retorno.cStat, ret.Retorno.xMotivo), xml);
@@ -94,6 +101,8 @@ public sealed class TransmissorSefaz : ITransmissorSefaz
         var ret = s.NfeStatusServico().Retorno;
         return new RespostaSefaz(ret.cStat, ret.xMotivo);
     });
+
+    static string Limitar(string s, int max) => s.Length <= max ? s : s[..max];
 
     static RespostaSefaz Resposta(protNFe p) =>
         new(p.infProt.cStat, p.infProt.xMotivo, p.infProt.nProt ?? "", p, p.infProt.dhRecbto);

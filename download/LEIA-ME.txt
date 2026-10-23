@@ -1,4 +1,4 @@
-GESTÃO COMERCIAL 2.5.0
+GESTÃO COMERCIAL 2.6.0
 
 WINDOWS
 1. Baixe GestaoComercial-Windows.zip
@@ -27,3 +27,9 @@ O programa começa em HOMOLOGAÇÃO (notas de teste, sem valor fiscal). Faça al
 mude para PRODUÇÃO na mesma tela. Confira a tributação (CSOSN/CST, CFOP) com o seu contador.
 Para emitir: depois da venda, clique em "Nota fiscal" (ou na lista de Vendas). O que faltar fica em
 vermelho para você completar ali mesmo.
+
+SEM INTERNET (contingência da NFC-e) — novo na 2.6.0
+Se a internet cair ou a SEFAZ sair do ar, a NFC-e sai mesmo assim, "EM CONTINGÊNCIA": imprima o cupom e
+entregue ao cliente. O programa envia as notas sozinho quando a internet voltar (tenta a cada 3 minutos;
+também há o botão "Enviar agora" em Notas fiscais). O prazo para o envio é de 24 horas: não desligue o
+computador por muito tempo sem internet. A NF-e (nota para empresa) não tem esse modo: fica pendente.

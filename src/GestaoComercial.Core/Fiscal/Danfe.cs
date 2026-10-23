@@ -4,6 +4,7 @@ using DFe.Classes.Flags;
 using DFe.Utils;
 using NFe.Classes;
 using NFe.Classes.Protocolo;
+using NFe.Classes.Informacoes.Identificacao.Tipos;
 using NFe.Classes.Informacoes.Pagamento;
 using QRCoder;
 using NFeDoc = NFe.Classes.NFe;
@@ -33,9 +34,10 @@ public static class Danfe
         {
             "CANCELADA" => "NOTA CANCELADA",
             "AUTORIZADA" => n.Homologacao ? "EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO – SEM VALOR FISCAL" : "",
+            "CONTINGENCIA" => "EMITIDA EM CONTINGÊNCIA" + (n.Homologacao ? " – AMBIENTE DE HOMOLOGAÇÃO, SEM VALOR FISCAL" : ""),
             _ => "NÃO AUTORIZADA PELA SEFAZ – SEM VALOR FISCAL",
         };
-        return nfe.infNFe.ide.mod == ModeloDocumento.NFCe ? Nfce(nfe, prot, aviso) : NfeA4(nfe, prot, aviso);
+        return nfe.infNFe.ide.mod == ModeloDocumento.NFCe ? Nfce(nfe, prot, aviso, n.EmContingencia) : NfeA4(nfe, prot, aviso);
     }
 
     /// <summary>Número da NF-e no DANFE: 000.000.001 (no formato do .NET o ponto seria vírgula decimal).</summary>
@@ -65,7 +67,8 @@ public static class Danfe
     }
 
     // ------------------------------------------------------------------ NFC-e (80 mm)
-    static string Nfce(NFeDoc nfe, protNFe? prot, string aviso)
+    /// <param name="pendente">Emitida em contingência e ainda não autorizada: o manual do DANFE NFC-e pede os dois avisos.</param>
+    static string Nfce(NFeDoc nfe, protNFe? prot, string aviso, bool pendente = false)
     {
         var i = nfe.infNFe; var e = i.emit; var t = i.total.ICMSTot;
         var chave = i.Id[3..];
@@ -105,6 +108,8 @@ img { width: 36mm; height: 36mm; display: block; margin: 4px auto; }
                                : $"<div class=\"c s\"><b>CONSUMIDOR</b> {H(Doc(dest.CNPJ, dest.CPF))}{(string.IsNullOrEmpty(dest.xNome) ? "" : "<br>" + H(dest.xNome))}</div>");
         sb.Append($"<hr><div class=\"c s\"><b>NFC-e nº {i.ide.nNF:000000000} Série {i.ide.serie:000}</b> {i.ide.dhEmi.LocalDateTime:dd/MM/yyyy HH:mm:ss}");
         if (prot?.infProt is { } ip) sb.Append($"<br>Protocolo de autorização: {H(ip.nProt)}<br>Data de autorização: {ip.dhRecbto.LocalDateTime:dd/MM/yyyy HH:mm:ss}");
+        else if (pendente) sb.Append("<div class=\"aviso\">EMITIDA EM CONTINGÊNCIA<br>Pendente de autorização</div>");
+        if (prot != null && i.ide.tpEmis == TipoEmissao.teOffLine) sb.Append("<br>Emitida em contingência");
         sb.Append("</div>");
         if (nfe.infNFeSupl?.qrCode is { Length: > 0 } qr) sb.Append($"<img src=\"{QrPng(qr)}\" alt=\"QR Code\">");
         if (t.vTotTrib is > 0) sb.Append($"<div class=\"c s\">Tributos totais incidentes (Lei Federal 12.741/2012): R$ {R(t.vTotTrib.Value)}</div>");

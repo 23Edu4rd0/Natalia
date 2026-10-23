@@ -60,6 +60,8 @@ public sealed class ConfigFiscal
     /// <summary>Pix recebido por chave/QR fixo (20 = estático) ou pelo QR da maquininha/banco a cada venda (17 = dinâmico).</summary>
     public string TipoPix { get; set; } = "20";
     public string InfoComplementar { get; set; } = "";
+    /// <summary>Sem comunicação com a SEFAZ, a NFC-e sai em contingência offline (e é enviada depois, sozinha).</summary>
+    public bool ContingenciaAutomatica { get; set; } = true;
 
     // ---- responsável técnico (exigido por várias SEFAZ): quem fez/mantém o programa
     public string RespTecCnpj { get; set; } = "";

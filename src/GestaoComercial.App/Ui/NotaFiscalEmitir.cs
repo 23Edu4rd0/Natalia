@@ -231,9 +231,12 @@ public sealed class EmitirNotaDialog : JanelaBase
     {
         var p = cfg.Pendencias(dados.Modelo);
         configurar.IsVisible = p.Count > 0;
+        var cont = dados.Modelo == 65 && cfg.ContingenciaAutomatica ? svc.ContingenciaAtiva() : null;
         if (p.Count > 0) Avisar("Antes de emitir, configure a nota fiscal: " + Limitar(p), "aviso");
+        else if (cont != null)
+            Avisar($"Sem comunicação com a SEFAZ desde {cont.Inicio.LocalDateTime:HH:mm}: esta NFC-e sai em CONTINGÊNCIA. O cupom vale para o cliente e a nota é enviada sozinha quando a internet voltar.", "aviso");
         else if (caixaAviso.Tag as string == "config") caixaAviso.IsVisible = false;
-        if (p.Count > 0) caixaAviso.Tag = "config";
+        if (p.Count > 0 || cont != null) caixaAviso.Tag = "config";
     }
 
     void Avisar(string texto, string tom)
@@ -347,7 +350,7 @@ public sealed class EmitirNotaDialog : JanelaBase
         {
             var r = EmSegundoPlano ? await Task.Run(() => svc.EmitirNota(d)) : svc.EmitirNota(d);
             Resultado = r;
-            if (r.Autorizada) { Close(); return r; }
+            if (r.Autorizada || r.Contingencia) { Close(); return r; }
             Avisar(r.Status == "PENDENTE" ? r.Mensagem + "\nA nota ficou pendente com o mesmo número. Clique em “Tentar de novo”." : r.Mensagem, r.Status == "PENDENTE" ? "aviso" : "erro");
             if (r.Status is "PENDENTE" or "REJEITADA") emitir.Content = MontarConteudoBotao("Tentar de novo");
             return r;

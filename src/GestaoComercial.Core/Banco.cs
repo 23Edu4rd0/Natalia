@@ -5,7 +5,7 @@ namespace GestaoComercial.Core;
 /// <summary>Conexão SQLite e criação/migração do esquema (idêntico ao da versão Python).</summary>
 public static class Banco
 {
-    public const int VersaoEsquema = 3;
+    public const int VersaoEsquema = 4;
 
     public static SqliteConnection Conectar(string caminho)
     {
@@ -55,6 +55,7 @@ public static class Banco
         if (versao < 1) Rodar(conn, EsquemaV1);
         if (versao < 2) Rodar(conn, EsquemaV2);
         if (versao < 3) Rodar(conn, EsquemaV3);
+        if (versao < 4) Rodar(conn, EsquemaV4);
     }
 
     static void Rodar(SqliteConnection conn, string sql)
@@ -63,6 +64,46 @@ public static class Banco
         c.CommandText = sql;
         c.ExecuteNonQuery();
     }
+
+    /// <summary>
+    /// v4: contingência offline da NFC-e. Novas situações: CONTINGENCIA (emitida sem internet, falta enviar) e
+    /// SUBSTITUIDA (tentativa normal sem resposta, trocada por uma em contingência; é conferida quando a internet volta).
+    /// O SQLite não altera CHECK: a tabela é refeita com os mesmos dados.
+    /// </summary>
+    const string EsquemaV4 = """
+BEGIN;
+CREATE TABLE notas_fiscais_v4 (
+    id         INTEGER PRIMARY KEY,
+    venda_id   INTEGER NOT NULL REFERENCES vendas(id),
+    modelo     INTEGER NOT NULL CHECK (modelo IN (55, 65)),
+    serie      INTEGER NOT NULL,
+    numero     INTEGER NOT NULL,
+    ambiente   INTEGER NOT NULL CHECK (ambiente IN (1, 2)),
+    status     TEXT NOT NULL CHECK (status IN ('PENDENTE', 'AUTORIZADA', 'REJEITADA', 'DENEGADA', 'CANCELADA', 'INUTILIZADA', 'CONTINGENCIA', 'SUBSTITUIDA')),
+    chave      TEXT NOT NULL DEFAULT '',
+    protocolo  TEXT NOT NULL DEFAULT '',
+    cstat      INTEGER NOT NULL DEFAULT 0,
+    motivo     TEXT NOT NULL DEFAULT '',
+    criada_em  TEXT NOT NULL,
+    emitida_em TEXT NOT NULL DEFAULT '',
+    dest_doc   TEXT NOT NULL DEFAULT '',
+    dest_nome  TEXT NOT NULL DEFAULT '',
+    total      INTEGER NOT NULL DEFAULT 0,
+    xml        TEXT NOT NULL DEFAULT '',
+    xml_evento TEXT NOT NULL DEFAULT '',
+    substituta_id INTEGER,
+    UNIQUE (modelo, serie, numero, ambiente)
+);
+INSERT INTO notas_fiscais_v4 (id, venda_id, modelo, serie, numero, ambiente, status, chave, protocolo, cstat, motivo, criada_em, emitida_em, dest_doc, dest_nome, total, xml, xml_evento)
+    SELECT id, venda_id, modelo, serie, numero, ambiente, status, chave, protocolo, cstat, motivo, criada_em, emitida_em, dest_doc, dest_nome, total, xml, xml_evento FROM notas_fiscais;
+DROP TABLE notas_fiscais;
+ALTER TABLE notas_fiscais_v4 RENAME TO notas_fiscais;
+CREATE INDEX ix_notas_fiscais_venda ON notas_fiscais(venda_id);
+CREATE INDEX ix_notas_fiscais_status ON notas_fiscais(status);
+
+PRAGMA user_version = 4;
+COMMIT;
+""";
 
     /// <summary>v3: nota fiscal eletrônica (dados fiscais dos produtos, endereço fiscal dos clientes e notas emitidas).</summary>
     const string EsquemaV3 = """

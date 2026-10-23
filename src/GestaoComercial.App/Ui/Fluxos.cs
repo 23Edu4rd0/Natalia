@@ -90,10 +90,10 @@ public static class Fluxos
     public static async Task NotaFiscalAsync(Window? dono, MainWindow app, long vendaId, int? modelo = null)
     {
         var svc = app.Svc;
-        if (svc.NotasDaVenda(vendaId).FirstOrDefault(n => n.Autorizada) is { } aut) { await AbrirDanfeAsync(dono, aut); return; }
+        if (svc.NotasDaVenda(vendaId).FirstOrDefault(n => n.Autorizada || n.EmContingencia) is { } aut) { await AbrirDanfeAsync(dono, aut); return; }
         var r = await EmitirNotaDialog.Abrir(dono, svc, vendaId, modelo ?? ModeloSugerido(svc, vendaId));
         if (r != null) app.AtualizarTudo();
-        if (r is { Autorizada: true }) await AvisarAutorizadaAsync(dono, svc, r);
+        if (r is { Autorizada: true } or { Contingencia: true }) await AvisarAutorizadaAsync(dono, svc, r);
     }
 
     /// <summary>
@@ -110,17 +110,18 @@ public static class Fluxos
         try { r = EmitirNotaDialog.EmSegundoPlano ? await Task.Run(() => svc.EmitirNota(d)) : svc.EmitirNota(d); }
         catch (ValidacaoException) { await NotaFiscalAsync(dono, app, vendaId, 65); return; }
         app.AtualizarTudo();
-        if (r.Autorizada) { await AvisarAutorizadaAsync(dono, svc, r); return; }
+        if (r.Autorizada || r.Contingencia) { await AvisarAutorizadaAsync(dono, svc, r); return; }
         Plat.Atual.Toast(dono, r.Mensagem, Nivel.Aviso, new (string, Action)[] { ("Abrir a nota", () => _ = NotaFiscalAsync(dono, app, vendaId, 65)) }, 15);
     }
 
+    /// <summary>Autorizada ou em contingência: avisa e abre o cupom (em contingência o cupom impresso é o que vale para o cliente).</summary>
     static async Task AvisarAutorizadaAsync(Window? dono, Servico svc, Core.Fiscal.ResultadoNota r)
     {
         var n = svc.ObterNotaFiscal(r.NotaId);
-        Plat.Atual.Toast(dono, r.Mensagem, Nivel.Info, new (string, Action)[]
+        Plat.Atual.Toast(dono, r.Mensagem, r.Contingencia ? Nivel.Aviso : Nivel.Info, new (string, Action)[]
         {
             ("Imprimir de novo", () => _ = AbrirDanfeAsync(dono, svc.ObterNotaFiscal(r.NotaId))),
-        }, 8);
+        }, r.Contingencia ? 12 : 8);
         await AbrirDanfeAsync(dono, n);
     }
 }

@@ -42,6 +42,7 @@ public sealed class ConfigFiscalDialog : JanelaBase
     public TextBox CscId { get; } = K.Caixa("", double.NaN, "Ex.: 000001");
     public TextBox Csc { get; } = K.Caixa("", double.NaN, "Código gerado no site da SEFAZ");
     public ComboBox VersaoQr { get; } = K.Combo(new[] { "Versão 2 (com CSC)", "Versão 3 (sem CSC)" }, double.NaN, "Versão 2 (com CSC)");
+    public CheckBox Contingencia { get; } = new() { Content = new TextBlock { Text = "Sem internet, emitir em contingência offline (o cupom sai na hora e o programa envia a nota quando a conexão voltar)", TextWrapping = TextWrapping.Wrap }, IsChecked = true };
     public TextBox SerieNfce { get; } = K.Caixa("1");
     public TextBox ProximoNfce { get; } = K.Caixa("1");
     public TextBox SerieNfe { get; } = K.Caixa("1");
@@ -124,7 +125,7 @@ public sealed class ConfigFiscalDialog : JanelaBase
         var nfce = K.Secao("NFC-e (cupom fiscal ao consumidor)", Pilha(
             Grade(K.Campo("Identificador do CSC (ID)", CscId), K.Campo("Versão do QR Code", VersaoQr)),
             K.Campo("CSC (código de segurança do contribuinte)", Csc),
-            Grade(K.Campo("Série", SerieNfce), K.Campo("Próximo número", ProximoNfce))),
+            Grade(K.Campo("Série", SerieNfce), K.Campo("Próximo número", ProximoNfce)), Contingencia),
             subtitulo: "O CSC é gerado no site da SEFAZ do seu estado, na área do contribuinte.", icone: "venda");
         var nfe = K.Secao("NF-e (nota para empresa, entrega ou outro estado)", Grade(K.Campo("Série", SerieNfe), K.Campo("Próximo número", ProximoNfe)), icone: "notas");
 
@@ -244,7 +245,7 @@ public sealed class ConfigFiscalDialog : JanelaBase
         Telefone.Text = cfg.Telefone.Length > 0 ? cfg.Telefone : emp.Telefone;
         arquivoCert = cfg.CertificadoArquivo; Senha.Text = cfg.CertificadoSenha;
         DefinirAmbiente(cfg.Ambiente);
-        CscId.Text = cfg.CscId; Csc.Text = cfg.Csc; VersaoQr.SelectedIndex = cfg.VersaoQrCode == 3 ? 1 : 0;
+        CscId.Text = cfg.CscId; Csc.Text = cfg.Csc; VersaoQr.SelectedIndex = cfg.VersaoQrCode == 3 ? 1 : 0; Contingencia.IsChecked = cfg.ContingenciaAutomatica;
         SerieNfce.Text = cfg.SerieNfce.ToString(); SerieNfe.Text = cfg.SerieNfe.ToString();
         MostrarNumeracao();
         foreach (var t in new[] { SerieNfce, SerieNfe }) t.TextChanged += (_, _) => MostrarNumeracao();
@@ -408,6 +409,7 @@ public sealed class ConfigFiscalDialog : JanelaBase
         c.CertificadoArquivo = arquivoCert; c.CertificadoSenha = Senha.Text ?? "";
         c.Ambiente = Ambiente;
         c.CscId = (CscId.Text ?? "").Trim(); c.Csc = (Csc.Text ?? "").Trim(); c.VersaoQrCode = VersaoQr.SelectedIndex == 1 ? 3 : 2;
+        c.ContingenciaAutomatica = Contingencia.IsChecked == true;
         c.SerieNfce = Inteiro(SerieNfce, "Série da NFC-e"); c.SerieNfe = Inteiro(SerieNfe, "Série da NF-e");
         c.CfopPadrao = Util.SomenteDigitos(Cfop.Text); c.TributacaoPadrao = TribEscolhida();
         c.AliquotaIcms = Num(AliqIcms, "Alíquota de ICMS"); c.CstPisCofins = PisCofinsCodigos[Math.Max(0, PisCofins.SelectedIndex)];

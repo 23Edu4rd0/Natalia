@@ -19,7 +19,10 @@ public sealed class SefazFalsa : ITransmissorSefaz
     public Func<NFeDoc, RespostaSefaz> AoAutorizar { get; set; } = nfe => Aprovar(nfe);
     public Func<string, RespostaSefaz> AoConsultar { get; set; } = _ => new RespostaSefaz(217, "Rejeição: NF-e não consta na base de dados da SEFAZ");
     public bool SemInternet { get; set; }
-    public int Envios, Consultas, Cancelamentos, Inutilizacoes;
+    public int Envios, Consultas, Cancelamentos, Inutilizacoes, Tentativas;
+    /// <summary>Chave da NFC-e substituta no último cancelamento por substituição (110112).</summary>
+    public string? UltimaSubstituta;
+    public List<int> NumerosInutilizados { get; } = new();
     public NFeDoc? Ultima;
     public string UltimoLote = "";
 
@@ -44,6 +47,7 @@ public sealed class SefazFalsa : ITransmissorSefaz
         var lote = new enviNFe4("4.00", 1, IndicadorSincronizacao.Sincrono, new List<NFeDoc> { nfe }).ObterXmlString();
         Validador.Valida(ServicoNFe.NFeAutorizacao, VersaoServico.Versao400, lote, true, conf);   // como a biblioteca faz antes de enviar
         UltimoLote = lote;
+        Tentativas++;
         Rede();
         Envios++; Ultima = nfe;
         return AoAutorizar(nfe);
@@ -51,14 +55,15 @@ public sealed class SefazFalsa : ITransmissorSefaz
 
     public RespostaSefaz Consultar(string chave, ConfiguracaoServico conf, X509Certificate2 cert) { Rede(); Consultas++; return AoConsultar(chave); }
 
-    public (RespostaSefaz, string) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert)
+    public (RespostaSefaz, string) Cancelar(string chave, string protocolo, string justificativa, string cnpj, ConfiguracaoServico conf, X509Certificate2 cert,
+                                            string? chaveSubstituta = null)
     {
-        Rede(); Cancelamentos++;
+        Rede(); Cancelamentos++; UltimaSubstituta = chaveSubstituta;
         return (new RespostaSefaz(135, "Evento registrado e vinculado a NF-e", "135260000099999"), $"<procEventoNFe><chNFe>{chave}</chNFe><xJust>{justificativa}</xJust></procEventoNFe>");
     }
 
     public RespostaSefaz Inutilizar(string cnpj, int ano, int modelo, int serie, int numero, string justificativa, ConfiguracaoServico conf, X509Certificate2 cert)
-    { Rede(); Inutilizacoes++; return new RespostaSefaz(102, "Inutilização de número homologado"); }
+    { Rede(); Inutilizacoes++; NumerosInutilizados.Add(numero); return new RespostaSefaz(102, "Inutilização de número homologado"); }
 
     public RespostaSefaz Status(ConfiguracaoServico conf, X509Certificate2 cert) { Rede(); return new RespostaSefaz(107, "Serviço em Operação"); }
 }
@@ -105,7 +110,11 @@ public class FiscalTests : BaseTeste
         return S.RegistrarVenda(new[] { new ItemVendaInput(p1, 2, 5990), new ItemVendaInput(p2, 1, 12990) }, cliente, desconto, forma);
     }
 
-    void Configurar(int crt = 1) => S.SalvarConfigFiscal(ConfigCompleta(Pasta, crt));
+    void Configurar(int crt = 1, bool contingencia = true)
+    {
+        var c = ConfigCompleta(Pasta, crt); c.ContingenciaAutomatica = contingencia;
+        S.SalvarConfigFiscal(c);
+    }
 
     // ------------------------------------------------------------------ configuração
     [Fact]
@@ -207,7 +216,8 @@ public class FiscalTests : BaseTeste
     [Fact]
     public void Sem_internet_fica_pendente_e_o_reenvio_usa_o_mesmo_numero()
     {
-        Configurar();
+        Configurar(contingencia: false);                                            // com a contingência ligada, sairia em contingência
+
         var v = Venda("Cartão de crédito");
         sefaz.SemInternet = true;
         var r = S.EmitirNota(S.PrepararNota(v));
@@ -226,7 +236,7 @@ public class FiscalTests : BaseTeste
     [Fact]
     public void Resposta_perdida_e_recuperada_pela_consulta_sem_reenviar()
     {
-        Configurar();
+        Configurar(contingencia: false);
         var v = Venda();
         NFeDoc? enviada = null;
         sefaz.AoAutorizar = nfe => { enviada = nfe; throw new SemComunicacaoException("caiu a internet depois de enviar"); };

@@ -18,6 +18,11 @@ public partial class Servico
 
     readonly SqliteConnection conn;
     long versao;
+    /// <summary>
+    /// A conexão do SQLite não aceita duas threads ao mesmo tempo, e a nota fiscal é enviada em segundo plano
+    /// (envio de contingência a cada poucos minutos): todo acesso ao banco passa por esta trava (reentrante).
+    /// </summary>
+    readonly object trava = new();
 
     public Servico(SqliteConnection conexao) { conn = conexao; }
 
@@ -49,29 +54,38 @@ public partial class Servico
         return cmd;
     }
 
-    int Exec(string sql, params object?[] a) { using var c = Cmd(sql, a); return c.ExecuteNonQuery(); }
+    int Exec(string sql, params object?[] a) { lock (trava) { using var c = Cmd(sql, a); return c.ExecuteNonQuery(); } }
 
     long Inserir(string sql, params object?[] a)
     {
-        Exec(sql, a);
-        return Escalar("SELECT last_insert_rowid()");
+        lock (trava)
+        {
+            Exec(sql, a);
+            return Escalar("SELECT last_insert_rowid()");
+        }
     }
 
     long Escalar(string sql, params object?[] a)
     {
-        using var c = Cmd(sql, a);
-        var r = c.ExecuteScalar();
-        return r is null or DBNull ? 0 : Convert.ToInt64(r);
+        lock (trava)
+        {
+            using var c = Cmd(sql, a);
+            var r = c.ExecuteScalar();
+            return r is null or DBNull ? 0 : Convert.ToInt64(r);
+        }
     }
 
     List<T> Todos<T>(string sql, Func<Rd, T> mapa, params object?[] a)
     {
-        using var c = Cmd(sql, a);
-        using var r = c.ExecuteReader();
-        var rd = new Rd(r);
-        var lista = new List<T>();
-        while (r.Read()) lista.Add(mapa(rd));
-        return lista;
+        lock (trava)
+        {
+            using var c = Cmd(sql, a);
+            using var r = c.ExecuteReader();
+            var rd = new Rd(r);
+            var lista = new List<T>();
+            while (r.Read()) lista.Add(mapa(rd));
+            return lista;
+        }
     }
 
     T? Um<T>(string sql, Func<Rd, T> mapa, params object?[] a) where T : class
@@ -87,18 +101,21 @@ public partial class Servico
     /// <summary>Transação atômica: BEGIN IMMEDIATE ... COMMIT (ou ROLLBACK se algo falhar).</summary>
     T Tx<T>(Func<T> corpo)
     {
-        Exec("BEGIN IMMEDIATE");
-        try
+        lock (trava)
         {
-            var r = corpo();
-            Exec("COMMIT");
-            Mudou();
-            return r;
-        }
-        catch
-        {
-            try { Exec("ROLLBACK"); } catch { /* já encerrada */ }
-            throw;
+            Exec("BEGIN IMMEDIATE");
+            try
+            {
+                var r = corpo();
+                Exec("COMMIT");
+                Mudou();
+                return r;
+            }
+            catch
+            {
+                try { Exec("ROLLBACK"); } catch { /* já encerrada */ }
+                throw;
+            }
         }
     }
 

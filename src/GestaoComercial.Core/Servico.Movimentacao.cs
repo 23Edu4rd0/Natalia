@@ -159,6 +159,8 @@ public partial class Servico
             var nf = UmV("SELECT modelo, numero FROM notas_fiscais WHERE venda_id = ? AND status = 'AUTORIZADA' LIMIT 1", r => (Mod: r.L("modelo"), Num: r.L("numero")), id);
             if (nf is { } x)
                 throw new ValidacaoException($"Esta venda tem a {(x.Mod == 65 ? "NFC-e" : "NF-e")} nº {x.Num} autorizada. Cancele a nota fiscal primeiro (página Notas fiscais).");
+            if (Escalar("SELECT numero FROM notas_fiscais WHERE venda_id = ? AND status = 'CONTINGENCIA' LIMIT 1", id) is > 0 and var nc)
+                throw new ValidacaoException($"Esta venda tem a NFC-e nº {nc} emitida em contingência (sem internet). Espere ela ser enviada à SEFAZ e cancele a nota primeiro.");
             foreach (var it in Todos("SELECT produto_id, quantidade FROM venda_itens WHERE venda_id = ?", r => (Pid: r.L("produto_id"), Qtd: r.L("quantidade")), id))
             {
                 Exec("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", it.Qtd, it.Pid);

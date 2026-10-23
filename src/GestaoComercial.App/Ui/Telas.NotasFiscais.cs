@@ -15,6 +15,9 @@ public sealed class NotasFiscaisTela : Tela
     readonly TextBlock rodape = K.Discreto("");
     readonly Border faixaConfig;
     readonly Button botaoConfig;
+    readonly Border faixaContingencia;
+    readonly TextBlock lblContingencia = new() { FontSize = 13.5, TextWrapping = Avalonia.Media.TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Foreground = Cores.P("#7C2D12") };
+    public string TextoContingencia => faixaContingencia.IsVisible ? lblContingencia.Text ?? "" : "";
     readonly TextBlock lblConfig = new() { FontSize = 13.5, TextWrapping = Avalonia.Media.TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     List<NotaFiscal> notas = new();
     readonly Control acoes;
@@ -53,7 +56,19 @@ public sealed class NotasFiscaisTela : Tela
             Background = Cores.P("#FFFBEB"), BorderBrush = Cores.P("#FDE68A"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 12),
             Margin = new Thickness(0, 0, 0, 18), Child = linhaFaixa,
         };
-        Content = K.Doca(faixaConfig, K.Lista(Tabela, K.Ferramentas(filtros, botoes), baixo,
+
+        // NFC-e emitidas sem internet: quantas faltam enviar e o prazo
+        var enviar = K.Botao("Enviar agora", SeguroAsync(EnviarAgoraAsync), icone: "raio", classe: "primario");
+        enviar.VerticalAlignment = VerticalAlignment.Center;
+        var iconeCont = Icones.Criar("info", 20, "#EA580C"); iconeCont.VerticalAlignment = VerticalAlignment.Center;
+        var linhaCont = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,12,*,16,Auto") };
+        K.ColocarNaGrade(linhaCont, iconeCont, 0, 0); K.ColocarNaGrade(linhaCont, lblContingencia, 0, 2); K.ColocarNaGrade(linhaCont, enviar, 0, 4);
+        faixaContingencia = new Border
+        {
+            Background = Cores.P("#FFF7ED"), BorderBrush = Cores.P("#FDBA74"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 12),
+            Margin = new Thickness(0, 0, 0, 18), Child = linhaCont, IsVisible = false,
+        };
+        Content = K.Doca(new StackPanel { Children = { faixaContingencia, faixaConfig } }, K.Lista(Tabela, K.Ferramentas(filtros, botoes), baixo,
             "Nenhuma nota fiscal neste período.\nPara emitir: depois da venda, clique em “Nota fiscal”, ou na lista de Vendas.", "notas"));
         Tabela.Duplo += SeguroAsync(VerAsync);
     }
@@ -66,10 +81,11 @@ public sealed class NotasFiscaisTela : Tela
         lblConfig.Text = p.Count > 0 ? $"A nota fiscal ainda não está configurada ({p.Count} item(ns) faltando). Leva uns minutos: dados da empresa, certificado digital e CSC."
                                      : "Você está no ambiente de HOMOLOGAÇÃO: as notas são de teste, sem valor fiscal. Quando estiver tudo certo, mude para produção na configuração.";
         botaoConfig.Content = p.Count > 0 ? "Configurar agora" : "Abrir configuração";
+        MostrarContingencia();
         notas = Svc.ListarNotasFiscais(Util.ParseDataBr(De.Text, "Data inicial"), Util.ParseDataBr(Ate.Text, "Data final"));
         Tabela.Definir(notas.Select(n => new Linha
         {
-            Id = n.Id.ToString(), Estilo = n.Status is "CANCELADA" or "INUTILIZADA" ? "cancelado" : n.Status is "REJEITADA" or "DENEGADA" ? "alerta" : "",
+            Id = n.Id.ToString(), Estilo = n.Status is "CANCELADA" or "INUTILIZADA" or "SUBSTITUIDA" ? "cancelado" : n.Status is "REJEITADA" or "DENEGADA" ? "alerta" : "",
             Fabrica = () => new[]
             {
                 n.Numero.ToString(), n.Tipo, Util.FmtData(n.CriadaEm), n.DestNome.Length > 0 ? n.DestNome : n.DestDoc.Length > 0 ? Util.FmtDocumento(n.DestDoc) : "Consumidor",
@@ -83,8 +99,36 @@ public sealed class NotasFiscaisTela : Tela
     public static string Situacao(string status) => status switch
     {
         "AUTORIZADA" => "Autorizada", "PENDENTE" => "Pendente", "REJEITADA" => "Rejeitada", "DENEGADA" => "Denegada",
-        "CANCELADA" => "Cancelada", "INUTILIZADA" => "Inutilizada", _ => status,
+        "CANCELADA" => "Cancelada", "INUTILIZADA" => "Inutilizada", "CONTINGENCIA" => "Contingência", "SUBSTITUIDA" => "Substituída", _ => status,
     };
+
+    void MostrarContingencia()
+    {
+        var pendentes = Svc.NotasEmContingencia();
+        var modo = Svc.ContingenciaAtiva();
+        var recusadas = Svc.ListarNotasFiscais(limite: 200).Where(n => n.Status == "REJEITADA" && n.Offline).ToList();
+        var partes = new List<string>();
+        if (pendentes.Count > 0)
+        {
+            partes.Add($"{pendentes.Count} NFC-e emitida(s) sem internet (contingência) esperando envio à SEFAZ. O programa tenta enviar sozinho a cada poucos minutos.");
+            var horas = DateTime.TryParse(pendentes[0].CriadaEm, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t) ? (DateTime.Now - t).TotalHours : 0;
+            partes.Add(horas >= 18 ? $"ATENÇÃO: a mais antiga foi emitida há {horas:0} horas e o prazo é de 24 h. Confira a internet e clique em “Enviar agora”."
+                                   : "Prazo para o envio: até 24 h depois da venda.");
+        }
+        else if (modo != null)
+            partes.Add($"Sem comunicação com a SEFAZ desde {modo.Inicio.LocalDateTime:dd/MM HH:mm}: as próximas NFC-e saem em contingência (o cupom vale e a nota é enviada depois).");
+        foreach (var r in recusadas)
+            partes.Add($"A NFC-e nº {r.Numero}, emitida em contingência, foi recusada pela SEFAZ: selecione e use “Tentar de novo” para corrigir (o cliente já levou o cupom; o número e a chave continuam os mesmos).");
+        faixaContingencia.IsVisible = partes.Count > 0;
+        lblContingencia.Text = string.Join("\n", partes);
+    }
+
+    public async Task EnviarAgoraAsync()
+    {
+        var r = await App.EnviarNotasPendentesAsync(avisarSemInternet: true);
+        AtualizarTudo();
+        if (r == null || r.NadaAFazer) Dica("Não há nota para enviar.");
+    }
 
     NotaFiscal Selecionada() => notas.FirstOrDefault(n => n.Id == Exigir(Tabela.IdLong, "uma nota")) ?? throw new ValidacaoException("Selecione uma nota na lista.");
 
@@ -118,6 +162,7 @@ public sealed class NotasFiscaisTela : Tela
     public async Task ReenviarAsync()
     {
         var n = Selecionada();
+        if (n.EmContingencia || n.Status == "SUBSTITUIDA") { await EnviarAgoraAsync(); return; }
         if (n.Status == "REJEITADA" || (n.Status == "PENDENTE" && n.Chave.Length == 0)) { await Fluxos.NotaFiscalAsync(Janela, App, n.VendaId, n.Modelo); return; }
         if (n.Status != "PENDENTE") { Dica($"Esta nota está {Situacao(n.Status).ToLowerInvariant()}: não há o que reenviar."); return; }
         var r = await Task.Run(() => Svc.ConsultarNota(n.Id));
@@ -130,6 +175,7 @@ public sealed class NotasFiscaisTela : Tela
     public async Task CancelarAsync()
     {
         var n = Selecionada();
+        if (n.EmContingencia) { Dica("Esta NFC-e ainda não foi enviada à SEFAZ (contingência). Depois de autorizada, dá para cancelar."); return; }
         if (!n.Autorizada) { Dica("Só dá para cancelar nota autorizada."); return; }
         var just = await Plat.Atual.Perguntar(Janela, "Cancelar nota fiscal",
             $"{n.Tipo} nº {n.Numero} — {Util.FmtDinheiro(n.Total)}\n\nO prazo é curto (NFC-e: cerca de 30 minutos; NF-e: 24 horas, na maioria dos estados).\n\nMotivo do cancelamento (mínimo 15 letras):");

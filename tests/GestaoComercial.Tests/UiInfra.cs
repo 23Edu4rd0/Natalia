@@ -70,6 +70,7 @@ public sealed class Ambiente : IDisposable
         if (!simples) S.SalvarConfig(MainWindow.ConfigModo, "avancado");
         Plat.Atual = P;
         K.DebounceMs = 0;                                   // busca imediata nos testes
+        MainWindow.IntervaloEnvioNotas = null;              // envio de contingência só quando o teste chamar
         Janela = new MainWindow(S) { Width = 1240, Height = 760 };
     }
 

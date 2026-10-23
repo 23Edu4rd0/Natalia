@@ -66,6 +66,18 @@ public sealed class MainWindow : JanelaBase
     readonly Dictionary<string, (long Versao, DateTime Dia)> ultimaAtualizacao = new();
     long versaoEmpresa = -1;
 
+    /// <summary>De quanto em quanto tempo tenta enviar as NFC-e emitidas em contingência (null desliga; os testes desligam).</summary>
+    public static TimeSpan? IntervaloEnvioNotas { get; set; } = TimeSpan.FromMinutes(3);
+    DispatcherTimer? timerNotas;
+    bool enviandoNotas;
+    /// <summary>Selo no item "Notas fiscais" do menu: quantas NFC-e esperam envio (contingência).</summary>
+    readonly Border seloNotas = new()
+    {
+        Background = Cores.P("#F59E0B"), CornerRadius = new CornerRadius(9), Padding = new Thickness(7, 1), MinWidth = 20, IsVisible = false,
+        VerticalAlignment = VerticalAlignment.Center, Child = new TextBlock { FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center },
+    };
+    public string TextoSeloNotas => seloNotas.IsVisible ? ((TextBlock)seloNotas.Child!).Text ?? "" : "";
+
     /// <summary>Nomes dos itens do menu que aparecem no modo atual.</summary>
     public IReadOnlyList<string> MenuVisivel => menu.Where(m => m.Botao.IsVisible).Select(m => m.Nome).ToList();
     public int ToastsAbertos => pilhaToasts.Children.Count;
@@ -117,6 +129,8 @@ public sealed class MainWindow : JanelaBase
         Grupo("Ajustes");
         Item("Configurações", "config", () => new ConfigTela(this));
         AplicarMenu();
+        ((StackPanel)menu.First(m => m.Nome == "Notas fiscais").Botao.Content!).Children.Add(seloNotas);
+        ToolTip.SetTip(seloNotas, "NFC-e emitidas sem internet esperando envio à SEFAZ");
 
         // marca: logotipo com degradê + nome da loja
         var logo = new Border
@@ -178,6 +192,14 @@ public sealed class MainWindow : JanelaBase
         Opened += (_, _) =>
         {
             IrPara("Painel");
+            // NFC-e em contingência: tenta enviar logo depois de abrir e depois de tempos em tempos
+            if (IntervaloEnvioNotas is { } intervalo)
+            {
+                timerNotas = new DispatcherTimer { Interval = intervalo };
+                timerNotas.Tick += async (_, _) => await EnviarNotasPendentesAsync();
+                timerNotas.Start();
+                DispatcherTimer.RunOnce(() => _ = EnviarNotasPendentesAsync(), TimeSpan.FromSeconds(20));
+            }
             // diagnóstico de velocidade de abertura: fora do caminho crítico
             Dispatcher.UIThread.Post(() =>
             {
@@ -185,6 +207,43 @@ public sealed class MainWindow : JanelaBase
                 catch { /* diagnóstico opcional */ }
             }, DispatcherPriority.Background);
         };
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        timerNotas?.Stop();
+        base.OnClosed(e);
+    }
+
+    /// <summary>
+    /// Envia as NFC-e emitidas em contingência (sem travar a tela) e confere as tentativas que ficaram sem resposta.
+    /// Só avisa quando algo aconteceu; sem internet fica quieto (a não ser que <paramref name="avisarSemInternet"/>).
+    /// </summary>
+    public async Task<Core.Fiscal.ResultadoEnvio?> EnviarNotasPendentesAsync(bool avisarSemInternet = false)
+    {
+        if (enviandoNotas) return null;
+        enviandoNotas = true;
+        try
+        {
+            if (!Svc.TemEnvioPendente()) { AtualizarSeloNotas(); return null; }
+            var r = EmitirNotaDialog.EmSegundoPlano ? await Task.Run(Svc.EnviarNotasPendentes) : Svc.EnviarNotasPendentes();
+            var aconteceu = r.Autorizadas > 0 || r.Rejeitadas > 0 || (!r.SemComunicacao && r.Mensagem.Length > 0);
+            if (r.Mensagem.Length > 0 && (aconteceu || avisarSemInternet))
+                Plat.Atual.Toast(this, r.Mensagem, r.Rejeitadas > 0 || r.SemComunicacao ? Nivel.Aviso : Nivel.Info,
+                                 new (string, Action)[] { ("Ver notas fiscais", () => IrPara("Notas fiscais")) }, 10);
+            if (aconteceu) AtualizarTudo(); else AtualizarSeloNotas();
+            return r;
+        }
+        catch (Exception ex) { Log.Erro("Envio das notas em contingência", ex); return null; }
+        finally { enviandoNotas = false; }
+    }
+
+    public void AtualizarSeloNotas()
+    {
+        int n;
+        try { n = Svc.NotasEmContingencia().Count; } catch (Exception) { return; }
+        seloNotas.IsVisible = n > 0;
+        ((TextBlock)seloNotas.Child!).Text = n.ToString();
     }
 
     void AoApertarTecla(object? s, KeyEventArgs e)
@@ -290,7 +349,7 @@ public sealed class MainWindow : JanelaBase
         var t = Telas[PaginaAtual];
         try
         {
-            if (versaoEmpresa != Svc.Versao) { nomeEmpresa.Text = Svc.ObterEmpresa().Nome; versaoEmpresa = Svc.Versao; }
+            if (versaoEmpresa != Svc.Versao) { nomeEmpresa.Text = Svc.ObterEmpresa().Nome; versaoEmpresa = Svc.Versao; AtualizarSeloNotas(); }
             var estado = (Svc.Versao, DateTime.Today);
             if (forcar || !ultimaAtualizacao.TryGetValue(PaginaAtual, out var u) || u != estado)
             {

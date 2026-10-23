@@ -60,6 +60,17 @@ public sealed record Pendencia(string Campo, string Mensagem);
 public sealed record ResultadoNota(long NotaId, string Status, string Mensagem, string Chave)
 {
     public bool Autorizada => Status == "AUTORIZADA";
+    /// <summary>Emitida sem internet (contingência offline): vale o cupom; vai para a SEFAZ depois.</summary>
+    public bool Contingencia => Status == "CONTINGENCIA";
+}
+
+/// <summary>Entrada em contingência offline da NFC-e: quando começou e o motivo (vai na nota).</summary>
+public sealed record Contingencia(DateTimeOffset Inicio, string Justificativa);
+
+/// <summary>Resultado do envio das notas guardadas (contingência) e da conferência das tentativas sem resposta.</summary>
+public sealed record ResultadoEnvio(int Autorizadas, int Rejeitadas, int Restantes, bool SemComunicacao, string Mensagem)
+{
+    public bool NadaAFazer => Autorizadas == 0 && Rejeitadas == 0 && Restantes == 0 && !SemComunicacao && Mensagem.Length == 0;
 }
 
 public static class RegrasNota

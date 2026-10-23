@@ -31,6 +31,15 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 ## O que ele faz
 
+**Novidades da 2.6: contingência offline da NFC-e (vender sem internet)**
+- **Caiu a internet ou a SEFAZ saiu do ar?** A NFC-e sai mesmo assim, **em contingência offline** (tipo de emissão 9): o cupom é impresso na hora com “EMITIDA EM CONTINGÊNCIA – Pendente de autorização” e o QR Code de contingência, e vale para o cliente.
+- **Envio sozinho**: o programa tenta mandar as notas guardadas a cada 3 minutos (e ao abrir). Quando a SEFAZ responde, elas viram *Autorizada* e o programa volta ao normal. Também dá para clicar em **Enviar agora** na aba *Notas fiscais*.
+- **Sem fila parada**: depois da primeira falha, as próximas NFC-e saem direto em contingência, sem esperar a SEFAZ.
+- **Sem nota em duplicidade**: se uma nota tinha sido enviada e a resposta não voltou, a contingência usa outro número. Quando a internet volta, o programa confere aquela: se a SEFAZ tinha autorizado, ele faz o **cancelamento por substituição**; se nunca recebeu, **inutiliza** o número. Tudo automático.
+- **Recusada depois?** A nota fica marcada na lista; corrija (ex.: NCM) e envie de novo: continua com o **mesmo número, chave e data** do cupom que o cliente levou.
+- Aviso na aba *Notas fiscais* e selo no menu com quantas faltam enviar, e alerta quando a mais antiga se aproxima do **prazo de 24 h**.
+- Pode ser desligada em *Configurar nota fiscal → NFC-e*. A **NF-e** (modelo 55) não tem contingência offline (a lei só permite com formulário de segurança): sem internet ela fica *pendente* para reenviar.
+
 **Novidades da 2.5: nota fiscal eletrônica de verdade (NFC-e e NF-e)**
 - **Emite NFC-e** (cupom fiscal, modelo 65) e **NF-e** (modelo 55) direto para a SEFAZ, com o certificado digital A1 da loja. Layout 4.00, XML assinado e conferido nos esquemas oficiais antes de enviar.
 - **O que falta, a pessoa completa na hora**: na tela *Emitir nota fiscal* vem tudo preenchido com o que o programa já sabe; o que faltar (NCM do produto, CPF/CNPJ, endereço do cliente na NF-e, inscrição estadual…) fica **em vermelho** para preencher ali mesmo. Com *“Guardar nos cadastros”* marcado, da próxima vez já vem preenchido.
@@ -50,7 +59,8 @@ Precisa do [.NET SDK 8](https://dotnet.microsoft.com/download).
 
 **Limites conhecidos (desta versão)**
 - Não foi testado contra a SEFAZ real neste desenvolvimento (precisa do certificado e do CSC da loja): os testes usam uma SEFAZ simulada, mas o XML é validado nos esquemas oficiais.
-- Não emite em **contingência offline** (sem internet a nota fica pendente para reenviar).
+- **NF-e** sem internet fica pendente (não há contingência offline para ela; as contingências SVC e EPEC, que dependem de internet, não estão no programa). A **NFC-e** tem contingência offline desde a 2.6.
+- Em contingência, entregue o **cupom impresso** ao cliente e mantenha a internet funcionando para o envio dentro do prazo (24 h na maioria dos estados).
 - Não calcula **DIFAL** (venda a consumidor de outro estado no regime normal: o programa avisa e não emite), nem substituição tributária com valores, nem os campos novos da reforma tributária (IBS/CBS).
 - Não envia a nota por e-mail sozinho (o XML e o DANFE ficam na pasta para enviar).
 
@@ -105,7 +115,7 @@ A senha do certificado digital não fica em texto puro (no Windows é protegida 
 ```
 src/GestaoComercial.Core   regras de negócio e SQLite (sem interface)
 src/GestaoComercial.App    telas (Avalonia)
-tests/GestaoComercial.Tests  209 testes: regras + interface renderizada em memória   →   dotnet test
+tests/GestaoComercial.Tests  225 testes: regras + interface renderizada em memória   →   dotnet test
 ```
 
 ## Bibliotecas de terceiros

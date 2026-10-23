@@ -9,7 +9,7 @@ namespace GestaoComercial.Tests;
 /// <summary>Telas da nota fiscal: emitir completando o que falta, configurar, lista de notas e NFC-e logo depois da venda.</summary>
 public class FiscalUiTests
 {
-    static (Ambiente A, SefazFalsa Sefaz) Preparar(bool configurar = true, bool simples = false)
+    static (Ambiente A, SefazFalsa Sefaz) Preparar(bool configurar = true, bool simples = false, bool contingencia = true)
     {
         var a = new Ambiente(simples);
         var sefaz = new SefazFalsa();
@@ -17,7 +17,11 @@ public class FiscalUiTests
         a.S.PastaFiscal = Path.Combine(a.Pasta, "notas-fiscais");
         a.S.Transmissor = sefaz;
         EmitirNotaDialog.EmSegundoPlano = false;
-        if (configurar) a.S.SalvarConfigFiscal(FiscalTests.ConfigCompleta(a.Pasta));
+        if (configurar)
+        {
+            var c = FiscalTests.ConfigCompleta(a.Pasta); c.ContingenciaAutomatica = contingencia;
+            a.S.SalvarConfigFiscal(c);
+        }
         a.Janela.Show();
         return (a, sefaz);
     }
@@ -115,7 +119,7 @@ public class FiscalUiTests
     [AvaloniaFact]
     public async Task Sem_internet_fica_pendente_e_tentar_de_novo_autoriza_com_o_mesmo_numero()
     {
-        var (a, sefaz) = Preparar(); using var _ = a;
+        var (a, sefaz) = Preparar(contingencia: false); using var _ = a;
         var v = Venda(a, "62044400");
         sefaz.SemInternet = true;
         await a.ComDialogo<EmitirNotaDialog>(() => Fluxos.NotaFiscalAsync(a.Janela, a.Janela, v), d =>

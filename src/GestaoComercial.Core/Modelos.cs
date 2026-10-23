@@ -65,11 +65,16 @@ public record FiscalCliente(long ClienteId, string IE, int IndIE, string Logrado
 
 /// <summary>Nota fiscal eletrônica emitida (ou tentada) para uma venda. Modelo 65 = NFC-e, 55 = NF-e.</summary>
 public record NotaFiscal(long Id, long VendaId, int Modelo, int Serie, long Numero, int Ambiente, string Status, string Chave, string Protocolo,
-                         int CStat, string Motivo, string CriadaEm, string EmitidaEm, string DestDoc, string DestNome, long Total, string Xml, string XmlEvento)
+                         int CStat, string Motivo, string CriadaEm, string EmitidaEm, string DestDoc, string DestNome, long Total, string Xml, string XmlEvento,
+                         long? SubstitutaId = null)
 {
     public string Tipo => Modelo == 65 ? "NFC-e" : "NF-e";
     public bool Homologacao => Ambiente == 2;
     public bool Autorizada => Status == "AUTORIZADA";
+    /// <summary>NFC-e emitida sem internet: o cupom já foi entregue e a nota espera para ser enviada à SEFAZ.</summary>
+    public bool EmContingencia => Status == "CONTINGENCIA";
+    /// <summary>O XML é de contingência offline (tpEmis 9), esteja ela já autorizada ou não.</summary>
+    public bool Offline => Xml.Contains("<tpEmis>9</tpEmis>");
     /// <summary>Pode tentar de novo com o mesmo número (nunca foi aceita pela SEFAZ).</summary>
     public bool PodeReenviar => Status is "PENDENTE" or "REJEITADA";
 }

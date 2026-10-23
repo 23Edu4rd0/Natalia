@@ -138,7 +138,7 @@ public sealed class Tabela : DataGrid
     {
         "Concluída" or "Ativo" or "Ativa" or "Entrada (troco)" or "Em dia" or "Autorizada" => (Cores.VerdeFundo, "#065F46"),
         "Cancelada" or "Inativo" or "Estornado" or "Retirada" or "Rejeitada" or "Denegada" => (Cores.VermelhoFundo, "#991B1B"),
-        "Fiado" or "Pendente" => (Cores.AmbarFundo, "#92400E"),
+        "Fiado" or "Pendente" or "Contingência" or "Substituída" => (Cores.AmbarFundo, "#92400E"),
         _ => (Cores.CinzaFundo, Cores.Cinza),
     };
 
